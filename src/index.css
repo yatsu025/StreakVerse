@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 7%;
+    --foreground: 210 20% 92%;
+
+    --card: 220 18% 10%;
+    --card-foreground: 210 20% 92%;
+
+    --popover: 220 18% 10%;
+    --popover-foreground: 210 20% 92%;
+
+    --primary: 150 100% 50%;
+    --primary-foreground: 220 20% 7%;
+
+    --secondary: 220 15% 16%;
+    --secondary-foreground: 210 20% 85%;
+
+    --muted: 220 14% 14%;
+    --muted-foreground: 215 15% 50%;
+
+    --accent: 270 100% 65%;
+    --accent-foreground: 210 20% 95%;
+
+    --destructive: 0 85% 55%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 15% 18%;
+    --input: 220 15% 18%;
+    --ring: 150 100% 50%;
+
+    --radius: 0.75rem;
+
+    /* Custom tokens */
+    --neon-green: 150 100% 50%;
+    --neon-cyan: 185 100% 55%;
+    --neon-purple: 270 100% 65%;
+    --neon-orange: 25 100% 55%;
+    --neon-pink: 330 100% 60%;
+    --surface-glass: 220 20% 12%;
+    --xp-bar: 150 100% 50%;
+
+    --sidebar-background: 220 18% 10%;
+    --sidebar-foreground: 210 20% 92%;
+    --sidebar-primary: 150 100% 50%;
+    --sidebar-primary-foreground: 220 20% 7%;
+    --sidebar-accent: 220 15% 16%;
+    --sidebar-accent-foreground: 210 20% 85%;
+    --sidebar-border: 220 15% 18%;
+    --sidebar-ring: 150 100% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+}
+
+@layer utilities {
+  .glow-green {
+    box-shadow: 0 0 15px hsl(var(--neon-green) / 0.3), 0 0 45px hsl(var(--neon-green) / 0.1);
+  }
+  .glow-cyan {
+    box-shadow: 0 0 15px hsl(var(--neon-cyan) / 0.3), 0 0 45px hsl(var(--neon-cyan) / 0.1);
+  }
+  .glow-purple {
+    box-shadow: 0 0 15px hsl(var(--neon-purple) / 0.3), 0 0 45px hsl(var(--neon-purple) / 0.1);
+  }
+  .text-glow-green {
+    text-shadow: 0 0 10px hsl(var(--neon-green) / 0.5), 0 0 30px hsl(var(--neon-green) / 0.2);
+  }
+  .text-glow-cyan {
+    text-shadow: 0 0 10px hsl(var(--neon-cyan) / 0.5), 0 0 30px hsl(var(--neon-cyan) / 0.2);
+  }
+  .glass-panel {
+    @apply bg-card/60 backdrop-blur-xl border border-border/50;
+  }
+}
