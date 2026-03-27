@@ -14,14 +14,22 @@ import { supabase } from "@/lib/supabaseClient";
 const queryClient = new QueryClient();
 
 const App = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(localStorage.getItem("streakverse_logged_in") === "true");
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsLoggedIn(!!session);
+      if (session) {
+        localStorage.setItem("streakverse_logged_in", "true");
+      }
+    });
+
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" && session) {
+      if (session) {
         localStorage.setItem("streakverse_logged_in", "true");
         setIsLoggedIn(true);
-      } else if (event === "SIGNED_OUT") {
+      } else {
         localStorage.removeItem("streakverse_logged_in");
         setIsLoggedIn(false);
       }
@@ -35,10 +43,13 @@ const App = () => {
   const hasCharacter = () => !!localStorage.getItem("streakverse_character");
 
   const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+    if (isLoggedIn === null) return <div className="min-h-screen flex items-center justify-center bg-background text-primary animate-pulse font-display text-2xl font-black tracking-wider">STREAK<span className="text-foreground">VERSE</span></div>;
     if (!isLoggedIn) return <Navigate to="/login" replace />;
     if (!hasCharacter()) return <Navigate to="/choose-character" replace />;
     return <>{children}</>;
   };
+
+  if (isLoggedIn === null) return <div className="min-h-screen flex items-center justify-center bg-background text-primary animate-pulse font-display text-2xl font-black tracking-wider">STREAK<span className="text-foreground">VERSE</span></div>;
 
   return (
     <QueryClientProvider client={queryClient}>

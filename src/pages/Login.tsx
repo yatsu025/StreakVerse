@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Flame, Github, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
@@ -7,10 +7,26 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    // If already logged in, redirect to dashboard or character select
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        if (localStorage.getItem("streakverse_character")) {
+          navigate("/");
+        } else {
+          navigate("/choose-character");
+        }
+      }
+    });
+  }, [navigate]);
+
   const handleGitHubLogin = async () => {
     setLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "github",
+      options: {
+        redirectTo: window.location.origin,
+      },
     });
     if (error) {
       console.error("Error logging in with GitHub:", error);
