@@ -1,9 +1,22 @@
-import { Zap } from "lucide-react";
-import { currentUser, getLevel, getXpProgress } from "@/lib/mockData";
+import { Zap, Loader2 } from "lucide-react";
+import { getLevel, getXpProgress } from "@/lib/mockData";
+import { useProfile } from "@/hooks/useProfile";
 
 const XpCard = () => {
-  const level = getLevel(currentUser.xp);
-  const progress = getXpProgress(currentUser.xp);
+  const { profile, loading } = useProfile();
+
+  if (loading) {
+    return (
+      <div className="glass-panel rounded-xl p-6 flex items-center justify-center h-48">
+        <Loader2 className="w-6 h-6 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (!profile) return null;
+
+  const level = getLevel(profile.xp);
+  const progress = getXpProgress(profile.xp);
 
   return (
     <div className="glass-panel rounded-xl p-6 animate-slide-up" style={{ animationDelay: "0.2s" }}>
@@ -14,13 +27,13 @@ const XpCard = () => {
         <Zap className="w-5 h-5 text-primary" />
       </div>
       <p className="font-display text-4xl font-black text-primary text-glow-green animate-count-up">
-        {currentUser.xp}
+        {profile.xp}
         <span className="text-base font-medium text-muted-foreground ml-1">XP</span>
       </p>
       <div className="mt-4">
         <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
           <span>{level.name}</span>
-          <span>{currentUser.xp} / {level.max} XP</span>
+          <span>{profile.xp} / {level.max} XP</span>
         </div>
         <div className="h-2.5 bg-secondary rounded-full overflow-hidden">
           <div
@@ -31,10 +44,10 @@ const XpCard = () => {
       </div>
       <div className="mt-3 text-xs text-muted-foreground">
         <span className="text-primary font-semibold">+10 XP</span> per day committed
-        {currentUser.current_streak >= 10 && (
+        {profile.current_streak >= 10 && (
           <span className="ml-2 text-neon-orange font-semibold">+10 bonus (10+ streak!)</span>
         )}
-        {currentUser.current_streak >= 5 && currentUser.current_streak < 10 && (
+        {profile.current_streak >= 5 && profile.current_streak < 10 && (
           <span className="ml-2 text-neon-cyan font-semibold">+5 bonus (5+ streak!)</span>
         )}
       </div>

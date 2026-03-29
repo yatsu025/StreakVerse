@@ -1,8 +1,18 @@
-import { GitCommit } from "lucide-react";
-import { recentCommits } from "@/lib/mockData";
+import { GitCommit, Loader2 } from "lucide-react";
+import { useProfile } from "@/hooks/useProfile";
 
 const ActivityGrid = () => {
-  const maxCommits = Math.max(...recentCommits.map((c) => c.commit_count), 1);
+  const { commits, loading } = useProfile();
+
+  if (loading) {
+    return (
+      <div className="glass-panel rounded-xl p-6 flex items-center justify-center h-48">
+        <Loader2 className="w-6 h-6 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  const maxCommits = Math.max(...commits.map((c) => c.commit_count), 1);
 
   return (
     <div className="glass-panel rounded-xl p-6 animate-slide-up" style={{ animationDelay: "0.3s" }}>
@@ -13,7 +23,7 @@ const ActivityGrid = () => {
         <GitCommit className="w-5 h-5 text-neon-cyan" />
       </div>
       <div className="grid grid-cols-7 gap-2">
-        {recentCommits.map((day) => {
+        {commits.map((day) => {
           const intensity = day.commit_count / maxCommits;
           return (
             <div key={day.date} className="group relative">
