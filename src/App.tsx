@@ -8,66 +8,81 @@ import Leaderboard from "./pages/Leaderboard.tsx";
 import Login from "./pages/Login.tsx";
 import CharacterSelect from "./pages/CharacterSelect.tsx";
 import NotFound from "./pages/NotFound.tsx";
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
 
-const App = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    // Check current session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setIsLoggedIn(!!session);
-      if (session) {
-        localStorage.setItem("streakverse_logged_in", "true");
-      }
-    });
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        localStorage.setItem("streakverse_logged_in", "true");
-        setIsLoggedIn(true);
-      } else {
-        localStorage.removeItem("streakverse_logged_in");
-        setIsLoggedIn(false);
-      }
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
-
-  const hasCharacter = () => !!localStorage.getItem("streakverse_character");
+const AppContent = () => {
+  const { session, loading } = useAuth();
 
   const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-    if (isLoggedIn === null) return <div className="min-h-screen flex items-center justify-center bg-background text-primary animate-pulse font-display text-2xl font-black tracking-wider">STREAK<span className="text-foreground">VERSE</span></div>;
-    if (!isLoggedIn) return <Navigate to="/login" replace />;
-    if (!hasCharacter()) return <Navigate to="/choose-character" replace />;
+    const character = localStorage.getItem("streakverse_character");
+    const hasCharacter = !!character;
+
+    if (loading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="text-primary animate-pulse font-display text-4xl font-black tracking-wider uppercase">
+              Verifying<br /><span className="text-foreground">Identity</span>
+            </div>
+            <div className="w-48 h-1 bg-secondary rounded-full overflow-hidden mt-4">
+              <div className="h-full bg-primary animate-progress-loading" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (!session) {
+      return <Navigate to="/login" replace />;
+    }
+
+    if (!hasCharacter) {
+      return <Navigate to="/choose-character" replace />;
+    }
+
     return <>{children}</>;
   };
 
-  if (isLoggedIn === null) return <div className="min-h-screen flex items-center justify-center bg-background text-primary animate-pulse font-display text-2xl font-black tracking-wider">STREAK<span className="text-foreground">VERSE</span></div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="text-primary animate-pulse font-display text-4xl font-black tracking-wider">
+            STREAK<span className="text-foreground">VERSE</span>
+          </div>
+          <div className="w-48 h-1 bg-secondary rounded-full overflow-hidden">
+            <div className="h-full bg-primary animate-progress-loading" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/leaderboard" element={<Leaderboard />} />
+        <Route path="/choose-character" element={<ProtectedRoute><CharacterSelect /></ProtectedRoute>} />
+        <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+};
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/choose-character" element={<CharacterSelect />} />
-            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+        <AppContent />
       </TooltipProvider>
-    </QueryClientProvider>
-  );
-};
+    </AuthProvider>
+  </QueryClientProvider>
+);
 
 export default App;

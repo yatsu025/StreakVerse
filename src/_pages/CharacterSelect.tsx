@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Flame, Check, ChevronRight } from "lucide-react";
+import { Flame, Check, ChevronRight, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/contexts/AuthContext";
 
 const characterSeeds = [
   "warrior", "mage", "rogue", "knight", "ninja", "samurai",
@@ -9,13 +11,32 @@ const characterSeeds = [
 
 const CharacterSelect = () => {
   const [selected, setSelected] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const handleConfirm = () => {
-    if (!selected) return;
-    localStorage.setItem("streakverse_avatar", `https://api.dicebear.com/9.x/pixel-art/svg?seed=${selected}`);
-    localStorage.setItem("streakverse_character", selected);
-    navigate("/");
+  const handleConfirm = async () => {
+    if (!selected || !user) return;
+    
+    setLoading(true);
+    const avatarUrl = `https://api.dicebear.com/9.x/pixel-art/svg?seed=${selected}`;
+    
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ avatar_url: avatarUrl })
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      localStorage.setItem("streakverse_avatar", avatarUrl);
+      localStorage.setItem("streakverse_character", selected);
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error("Error saving character:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -66,15 +87,21 @@ const CharacterSelect = () => {
 
         <button
           onClick={handleConfirm}
-          disabled={!selected}
+          disabled={!selected || loading}
           className={`w-full flex items-center justify-center gap-2 h-12 rounded-xl font-display font-bold text-sm tracking-wider transition-all ${
-            selected
+            selected && !loading
               ? "bg-primary text-primary-foreground glow-green hover:opacity-90"
               : "bg-secondary text-muted-foreground cursor-not-allowed"
           }`}
         >
-          ENTER THE VERSE
-          <ChevronRight className="w-4 h-4" />
+          {loading ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <>
+              ENTER THE VERSE
+              <ChevronRight className="w-4 h-4" />
+            </>
+          )}
         </button>
       </div>
     </div>
