@@ -19,7 +19,19 @@ export default function Dashboard() {
       if (!user) {
         router.push('/')
       } else {
+        // STEP 1: Dashboard me user object print kar
+        console.log("Supabase User:", user)
         setUser(user)
+
+        // STEP 2: username nikal
+        const username = user?.user_metadata?.user_name
+        console.log("GitHub Username:", username)
+
+        if (username) {
+          // STEP 4: function ko call kar
+          fetchGitHubEvents(user)
+        }
+
         // Fetch profile data
         const { data: profileData } = await supabase
           .from('profiles')
@@ -32,6 +44,88 @@ export default function Dashboard() {
     }
     checkUser()
   }, [router])
+
+  // Function to calculate and save profile data
+  const updateProfileInDatabase = async (user, pushEvents) => {
+    try {
+      const username = user?.user_metadata?.user_name
+      const avatar_url = user?.user_metadata?.avatar_url
+      
+      // Calculate XP (total commits * 10)
+      const xp = pushEvents.length * 10
+      
+      // Calculate Streak
+      // 1. Get unique dates from pushEvents
+      const commitDates = [...new Set(pushEvents.map(event => event.created_at.split('T')[0]))].sort()
+      
+      let currentStreak = 0
+      if (commitDates.length > 0) {
+        const today = new Date().toISOString().split('T')[0]
+        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+        
+        // Check if user committed today or yesterday to continue the streak
+        const lastCommitDate = commitDates[commitDates.length - 1]
+        
+        if (lastCommitDate === today || lastCommitDate === yesterday) {
+          currentStreak = 1
+          // Count backwards to find the streak length
+          for (let i = commitDates.length - 1; i > 0; i--) {
+            const current = new Date(commitDates[i])
+            const previous = new Date(commitDates[i-1])
+            const diffTime = Math.abs(current - previous)
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+            
+            if (diffDays === 1) {
+              currentStreak++
+            } else {
+              break
+            }
+          }
+        }
+      }
+
+      // Upsert into Supabase
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          username: username || user.user_metadata.full_name || 'anonymous',
+          avatar_url: avatar_url,
+          xp: xp,
+          current_streak: currentStreak
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      setProfile(data)
+      console.log("Database updated successfully:", data)
+    } catch (error) {
+      console.error("Error updating database:", error.message)
+    }
+  }
+
+  // STEP 3: create a function to fetch GitHub events using username
+  const fetchGitHubEvents = async (user) => {
+    try {
+      const username = user?.user_metadata?.user_name
+      const response = await fetch(`https://api.github.com/users/${username}/events`)
+      const data = await response.json()
+
+      // STEP 4: console.log(data)
+      console.log("GitHub Events Data:", data)
+
+      // STEP 5: filter only PushEvent commits
+      const pushEvents = data.filter(event => event.type === 'PushEvent')
+      console.log("Filtered PushEvents (Commits):", pushEvents)
+
+      // Save to database
+      await updateProfileInDatabase(user, pushEvents)
+
+    } catch (error) {
+      console.error("Error fetching GitHub events:", error)
+    }
+  }
 
   if (loading) {
     return (

@@ -1,13 +1,14 @@
+import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Index from "./pages/Index.tsx";
-import Leaderboard from "./pages/Leaderboard.tsx";
-import Login from "./pages/Login.tsx";
-import CharacterSelect from "./pages/CharacterSelect.tsx";
-import NotFound from "./pages/NotFound.tsx";
+import Index from "./_pages/Index";
+import Leaderboard from "./_pages/Leaderboard";
+import Login from "./_pages/Login";
+import CharacterSelect from "./_pages/CharacterSelect";
+import NotFound from "./_pages/NotFound";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
