@@ -3,97 +3,116 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
+const MEDAL = ['🥇', '🥈', '🥉']
+
 export default function Leaderboard() {
-  const [users, setUsers] = useState([])
+  const [users, setUsers]     = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError]     = useState(null)
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        setLoading(true)
-        const { data, error: fetchError } = await supabase
+        const { data, error: err } = await supabase
           .from('profiles')
           .select('id, username, xp, current_streak')
           .order('xp', { ascending: false })
           .limit(10)
 
-        if (fetchError) throw fetchError
+        if (err) throw err
         setUsers(data || [])
-      } catch (err) {
-        console.error('Error fetching leaderboard:', err.message)
-        // If current_streak also doesn't exist, try just id, username, xp
+      } catch (e) {
+        // retry without current_streak
         try {
-          const { data: retryData, error: retryError } = await supabase
+          const { data, error: e2 } = await supabase
             .from('profiles')
             .select('id, username, xp')
             .order('xp', { ascending: false })
             .limit(10)
-          if (!retryError) {
-            setUsers(retryData || [])
-            setError(null)
-            return
-          }
-        } catch (e) {
-          // ignore retry error
-        }
-        setError(err.message)
+          if (!e2) { setUsers(data || []); return }
+        } catch (_) {}
+        setError(e.message)
       } finally {
         setLoading(false)
       }
     }
-
     fetchLeaderboard()
   }, [])
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-gray-400 font-mono text-sm tracking-widest">FETCHING DATA...</p>
+      <div className="flex flex-col items-center justify-center py-24 gap-4">
+        <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-500 text-xs uppercase tracking-widest">Loading rankings…</p>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="glass-panel p-8 rounded-2xl text-center border border-red-500/20">
-        <p className="text-red-400">Failed to load leaderboard</p>
+      <div className="card border-red-500/20 text-center py-10">
+        <p className="text-red-400 font-semibold">Failed to load leaderboard</p>
         <p className="text-xs text-gray-500 mt-2">{error}</p>
       </div>
     )
   }
 
+  if (users.length === 0) {
+    return (
+      <div className="card text-center py-16">
+        <div className="text-4xl mb-4">🏜️</div>
+        <p className="text-gray-400 font-semibold">No data yet</p>
+        <p className="text-gray-600 text-sm mt-1">Be the first to claim the top spot.</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="glass-panel rounded-2xl overflow-hidden border border-white/5">
-      <table className="w-full text-left">
-        <thead className="bg-white/5 text-xs uppercase tracking-widest text-gray-400">
-          <tr>
-            <th className="px-6 py-4">Rank</th>
-            <th className="px-6 py-4">User</th>
-            <th className="px-6 py-4 text-right">XP</th>
-            <th className="px-6 py-4 text-right">Streak</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-white/5">
-          {users.length > 0 ? (
-            users.map((user, index) => (
-              <tr key={user.id || index} className="hover:bg-white/5 transition-colors group">
-                <td className="px-6 py-4 font-mono text-gray-500">{index + 1}</td>
-                <td className="px-6 py-4 font-bold">@{user.username || 'anonymous'}</td>
-                <td className="px-6 py-4 text-right text-green-500 font-mono">{(user.xp || 0).toLocaleString()}</td>
-                <td className="px-6 py-4 text-right font-bold text-orange-500">🔥 {user.current_streak || user.streak || 0}</td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan="4" className="px-6 py-12 text-center text-gray-500 italic">
-                No data available in the StreakVerse yet.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+    <div className="space-y-2">
+      {users.map((u, i) => {
+        const streak = u.current_streak ?? u.streak ?? 0
+        const isTop3 = i < 3
+        return (
+          <div
+            key={u.id ?? i}
+            className={`flex items-center gap-4 px-5 py-4 rounded-xl border transition-colors
+              ${isTop3
+                ? 'bg-white/[0.04] border-white/10 hover:border-green-500/20'
+                : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.04]'
+              }`}
+          >
+            {/* rank */}
+            <span className="w-8 text-center text-lg shrink-0 leading-none">
+              {MEDAL[i] ?? <span className="text-sm font-bold text-gray-600">#{i + 1}</span>}
+            </span>
+
+            {/* avatar placeholder */}
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0
+              ${isTop3 ? 'bg-green-500/15 text-green-400 border border-green-500/20' : 'bg-white/5 text-gray-400 border border-white/8'}`}>
+              {(u.username || 'A')[0].toUpperCase()}
+            </div>
+
+            {/* name */}
+            <div className="flex-1 min-w-0">
+              <p className={`font-semibold text-sm truncate ${isTop3 ? 'text-white' : 'text-gray-300'}`}>
+                @{u.username || 'anonymous'}
+              </p>
+            </div>
+
+            {/* streak */}
+            {streak > 0 && (
+              <span className="flex items-center gap-1 bg-orange-500/10 border border-orange-500/20 px-2.5 py-1 rounded-full text-xs font-bold text-orange-400 shrink-0">
+                🔥 {streak}d
+              </span>
+            )}
+
+            {/* xp */}
+            <span className={`text-sm font-black tabular-nums shrink-0 ${isTop3 ? 'text-green-400' : 'text-gray-500'}`}>
+              {(u.xp || 0).toLocaleString()} <span className="text-xs font-normal opacity-60">XP</span>
+            </span>
+          </div>
+        )
+      })}
     </div>
   )
 }
