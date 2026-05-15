@@ -238,43 +238,7 @@ export default function Home() {
               STREAK<span style={{ color: '#fff' }}>VERSE</span>
             </span>
           </div>
-
-          {/* Player HUD */}
-          <div className="hidden md:flex items-center gap-4">
-            {/* Level Badge */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded" style={{ background: 'rgba(0,255,102,0.08)', border: '1px solid rgba(0,255,102,0.2)' }}>
-              <span className="text-[9px] font-mono-sv tracking-widest" style={{ color: '#00FF6666' }}>LVL</span>
-              <span className="text-base font-orbitron font-black" style={{ color: '#00FF66' }}>{playerLevel}</span>
-            </div>
-            {/* XP Bar */}
-            <div className="flex flex-col gap-1 w-36">
-              <div className="flex justify-between">
-                <span className="text-[8px] font-mono-sv tracking-widest" style={{ color: '#FFD70099' }}>XP</span>
-                <span className="text-[8px] font-mono-sv" style={{ color: '#FFD700' }}>{totalXP.toLocaleString()}</span>
-              </div>
-              <XPBar value={totalXP % 5000} max={5000} color="#FFD700" height={5} />
-            </div>
-            {/* HP */}
-            <div className="flex flex-col gap-1 w-28">
-              <div className="flex justify-between items-center">
-                <div className="flex gap-0.5">
-                  {[...Array(5)].map((_, i) => <Heart key={i} className="w-2.5 h-2.5" style={{ color: i < 4 ? '#FF2D55' : '#ffffff22', fill: i < 4 ? '#FF2D55' : 'none' }} />)}
-                </div>
-                <span className="text-[8px] font-mono-sv" style={{ color: '#FF2D5599' }}>HP</span>
-              </div>
-              <XPBar value={80} max={100} color="#FF2D55" height={5} />
-            </div>
-          </div>
-
-          {/* Nav + System info */}
           <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-3 text-[9px] font-mono-sv tracking-widest" style={{ color: 'rgba(255,255,255,0.25)' }}>
-              <div className="flex items-center gap-1"><Wifi className="w-3 h-3" /><span>ONLINE</span></div>
-              <div className="flex items-center gap-1"><Battery className="w-3 h-3" /><span>98%</span></div>
-            </div>
-            <button onClick={() => setMuted(m => !m)} className="p-1.5 rounded transition-all" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.3)' }}>
-              {muted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-            </button>
             <Link href="/leaderboard" className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded text-[10px] font-mono-sv tracking-widest transition-all hover:scale-105" style={{ border: '1px solid rgba(255,107,53,0.3)', color: '#FF6B35', background: 'rgba(255,107,53,0.05)' }}>
               <Trophy className="w-3 h-3" /><span>RANKINGS</span>
             </Link>
@@ -476,73 +440,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ══════════════════════════════════════════ */}
-        {/* ────────────  LEADERBOARD  ─────────────── */}
-        {/* ══════════════════════════════════════════ */}
-        <section className="py-40 px-6 lg:px-12">
-          <div className="max-w-4xl mx-auto">
-            <GameSectionLabel color="#FF6B35" tag="GLOBAL_ARENA_SEASON04">TOP PREDATORS</GameSectionLabel>
-
-            <div className="mt-20 overflow-hidden rounded-sm" style={{ border: '1px solid rgba(255,107,53,0.2)', background: 'rgba(3,5,8,0.95)' }}>
-              {/* Table Header */}
-              <div className="px-8 py-5 flex items-center justify-between" style={{ background: 'rgba(255,107,53,0.05)', borderBottom: '1px solid rgba(255,107,53,0.15)' }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#00FF66', boxShadow: '0 0 8px #00FF66' }} />
-                  <span className="text-[9px] font-mono-sv tracking-[0.5em]" style={{ color: 'rgba(255,255,255,0.3)' }}>RANKED SEASON 04 · LIVE DATA</span>
-                </div>
-                <div className="flex gap-6 text-[8px] font-mono-sv tracking-widest" style={{ color: 'rgba(255,255,255,0.2)' }}>
-                  <span>PLAYER</span><span>STREAK</span><span>HP</span>
-                </div>
-              </div>
-
-              {/* Rows */}
-              <div>
-                {MOCK_LEADERBOARD.map((e, i) => (
-                  <div key={i} className="group px-8 py-6 flex items-center gap-6 cursor-default transition-all duration-200" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', background: i === 0 ? 'rgba(255,215,0,0.02)' : 'transparent' }}
-                    onMouseEnter={el => { (el.currentTarget as HTMLElement).style.background = 'rgba(255,107,53,0.04)' }}
-                    onMouseLeave={el => { (el.currentTarget as HTMLElement).style.background = i === 0 ? 'rgba(255,215,0,0.02)' : 'transparent' }}
-                  >
-                    {/* Rank */}
-                    <div className="w-10 text-center font-orbitron font-black text-2xl shrink-0" style={{ color: i === 0 ? '#FFD700' : 'rgba(255,255,255,0.15)' }}>
-                      {i < 3 ? e.medal : e.rank}
-                    </div>
-                    {/* Avatar */}
-                    <div className="relative w-12 h-12 rounded shrink-0 flex items-center justify-center font-orbitron font-black text-lg" style={{ background: `${CLASS_COLORS[e.class]}15`, border: `1px solid ${CLASS_COLORS[e.class]}33`, color: CLASS_COLORS[e.class] }}>
-                      {e.name[0]}
-                    </div>
-                    {/* Name + Class */}
-                    <div className="flex-1 min-w-0">
-                      <div className="font-orbitron font-black text-base tracking-tight mb-1" style={{ color: 'rgba(255,255,255,0.85)' }}>{e.name}</div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[8px] font-mono-sv tracking-widest px-2 py-0.5 rounded" style={{ background: `${CLASS_COLORS[e.class]}15`, border: `1px solid ${CLASS_COLORS[e.class]}33`, color: CLASS_COLORS[e.class] }}>
-                          {e.class}
-                        </span>
-                        <span className="text-[8px] font-mono-sv tracking-widest" style={{ color: 'rgba(255,255,255,0.2)' }}>LVL {e.level}</span>
-                      </div>
-                    </div>
-                    {/* HP Bar */}
-                    <div className="hidden md:flex flex-col gap-1 w-24 shrink-0">
-                      <span className="text-[8px] font-mono-sv tracking-widest" style={{ color: 'rgba(255,45,85,0.5)' }}>HP {e.hp}%</span>
-                      <XPBar value={e.hp} max={100} color="#FF2D55" height={4} />
-                    </div>
-                    {/* Streak */}
-                    <div className="flex items-center gap-2 px-5 py-3 rounded shrink-0" style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,107,53,0.2)' }}>
-                      <Flame className="w-5 h-5" style={{ color: '#FF6B35' }} />
-                      <span className="font-orbitron font-black text-xl" style={{ color: '#FF6B35' }}>{e.streak}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Footer */}
-              <div className="px-8 py-6 text-center" style={{ borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-                <Link href="/leaderboard" className="group inline-flex items-center gap-3 text-[9px] font-mono-sv tracking-[0.4em] transition-all hover:tracking-[0.6em]" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                  ENTER THE RANKINGS <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </div>
-            </div>
-          </div>
-        </section>
 
         {/* ══════════════════════════════════════════ */}
         {/* ─────────────  BADGES  ─────────────────── */}
