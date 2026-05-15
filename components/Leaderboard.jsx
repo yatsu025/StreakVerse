@@ -2,8 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { Flame, Trophy, Zap, Medal as MedalIcon, Target, Loader2 } from 'lucide-react'
 
-const MEDAL = ['🥇', '🥈', '🥉']
+const MEDAL_COLORS = [
+  'text-neon-orange drop-shadow-[0_0_8px_rgba(255,138,0,0.5)]',
+  'text-gray-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]',
+  'text-amber-600 drop-shadow-[0_0_8px_rgba(217,119,6,0.3)]'
+]
 
 export default function Leaderboard() {
   const [users, setUsers]     = useState([])
@@ -22,7 +27,6 @@ export default function Leaderboard() {
         if (err) throw err
         setUsers(data || [])
       } catch (e) {
-        // retry without current_streak
         try {
           const { data, error: e2 } = await supabase
             .from('profiles')
@@ -41,75 +45,102 @@ export default function Leaderboard() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-4">
-        <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-gray-500 text-xs uppercase tracking-widest">Loading rankings…</p>
+      <div className="flex flex-col items-center justify-center py-32 gap-6">
+        <Loader2 className="w-10 h-10 text-neon-green animate-spin" />
+        <p className="text-white/20 text-[10px] font-black uppercase tracking-[0.4em]">Synchronizing Rankings...</p>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="card border-red-500/20 text-center py-10">
-        <p className="text-red-400 font-semibold">Failed to load leaderboard</p>
-        <p className="text-xs text-gray-500 mt-2">{error}</p>
+      <div className="neo-card border-neon-red/20 text-center py-16">
+        <p className="text-neon-red font-black uppercase tracking-widest mb-4">Transmission Error</p>
+        <p className="text-xs text-white/40">{error}</p>
       </div>
     )
   }
 
   if (users.length === 0) {
     return (
-      <div className="card text-center py-16">
-        <div className="text-4xl mb-4">🏜️</div>
-        <p className="text-gray-400 font-semibold">No data yet</p>
-        <p className="text-gray-600 text-sm mt-1">Be the first to claim the top spot.</p>
+      <div className="neo-card text-center py-24">
+        <div className="text-6xl mb-8 opacity-20">🏜️</div>
+        <p className="text-white/40 font-black uppercase tracking-widest">Arena Empty</p>
+        <p className="text-white/20 text-xs mt-2">Initialize your core to claim the top spot.</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       {users.map((u, i) => {
         const streak = u.current_streak ?? u.streak ?? 0
         const isTop3 = i < 3
         return (
           <div
             key={u.id ?? i}
-            className={`flex items-center gap-4 px-5 py-4 rounded-xl border transition-colors
-              ${isTop3
-                ? 'bg-white/[0.04] border-white/10 hover:border-green-500/20'
-                : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.04]'
-              }`}
+            className={`
+              flex items-center gap-6 px-8 py-6 rounded-[2rem] transition-all duration-500 group relative overflow-hidden
+              ${isTop3 
+                ? 'glass border-white/10 shadow-[0_0_40px_rgba(255,255,255,0.02)] scale-[1.02]' 
+                : 'bg-white/[0.02] border border-white/5 hover:bg-white/[0.04]'}
+            `}
           >
-            {/* rank */}
-            <span className="w-8 text-center text-lg shrink-0 leading-none">
-              {MEDAL[i] ?? <span className="text-sm font-bold text-gray-600">#{i + 1}</span>}
-            </span>
-
-            {/* avatar placeholder */}
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0
-              ${isTop3 ? 'bg-green-500/15 text-green-400 border border-green-500/20' : 'bg-white/5 text-gray-400 border border-white/8'}`}>
-              {(u.username || 'A')[0].toUpperCase()}
-            </div>
-
-            {/* name */}
-            <div className="flex-1 min-w-0">
-              <p className={`font-semibold text-sm truncate ${isTop3 ? 'text-white' : 'text-gray-300'}`}>
-                @{u.username || 'anonymous'}
-              </p>
-            </div>
-
-            {/* streak */}
-            {streak > 0 && (
-              <span className="flex items-center gap-1 bg-orange-500/10 border border-orange-500/20 px-2.5 py-1 rounded-full text-xs font-bold text-orange-400 shrink-0">
-                🔥 {streak}d
-              </span>
+            {/* Background Glow for Top 3 */}
+            {isTop3 && (
+              <div className={`absolute inset-0 bg-gradient-to-r ${i === 0 ? 'from-neon-orange/5' : i === 1 ? 'from-white/5' : 'from-amber-600/5'} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000`} />
             )}
 
-            {/* xp */}
-            <span className={`text-sm font-black tabular-nums shrink-0 ${isTop3 ? 'text-green-400' : 'text-gray-500'}`}>
-              {(u.xp || 0).toLocaleString()} <span className="text-xs font-normal opacity-60">XP</span>
+            {/* rank */}
+            <span className={`w-12 text-center text-3xl font-display font-black italic shrink-0 leading-none ${isTop3 ? MEDAL_COLORS[i] : 'text-white/10'}`}>
+              {i + 1}
             </span>
+
+            {/* avatar */}
+            <div className={`
+              relative w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-display font-black shrink-0 transition-all duration-500
+              ${isTop3 
+                ? 'bg-white/10 border-2 border-white/20 group-hover:border-neon-green shadow-xl' 
+                : 'bg-white/5 text-white/20 border border-white/5'}
+            `}>
+              {(u.username || 'A')[0].toUpperCase()}
+              {isTop3 && (
+                <div className="absolute -top-1 -right-1">
+                  <MedalIcon className={`w-5 h-5 ${MEDAL_COLORS[i]}`} />
+                </div>
+              )}
+            </div>
+
+            {/* name & level */}
+            <div className="flex-1 min-w-0">
+              <p className={`font-display font-black text-xl truncate tracking-tight transition-colors ${isTop3 ? 'text-white' : 'text-white/40 group-hover:text-white/60'}`}>
+                {u.username || 'ANONYMOUS_UNIT'}
+              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <Zap className="w-3 h-3 text-neon-cyan fill-neon-cyan/20" />
+                <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">LVL {Math.floor((u.xp || 0) / 100) + 1}</span>
+              </div>
+            </div>
+
+            {/* stats container */}
+            <div className="flex items-center gap-8">
+              {/* streak */}
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Streak</span>
+                <div className="flex items-center gap-2 bg-black/40 border border-white/5 px-4 py-2 rounded-2xl group-hover:border-neon-orange/30 transition-all">
+                  <Flame className={`w-4 h-4 ${streak > 0 ? 'text-neon-orange fill-neon-orange/20' : 'text-white/10'}`} />
+                  <span className={`text-lg font-display font-black ${streak > 0 ? 'text-neon-orange' : 'text-white/10'}`}>{streak}</span>
+                </div>
+              </div>
+
+              {/* xp */}
+              <div className="flex flex-col items-end gap-1 min-w-[100px]">
+                <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Total XP</span>
+                <div className="text-2xl font-display font-black tabular-nums transition-colors group-hover:text-neon-green">
+                  {(u.xp || 0).toLocaleString()}
+                </div>
+              </div>
+            </div>
           </div>
         )
       })}

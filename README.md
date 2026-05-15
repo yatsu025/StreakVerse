@@ -297,34 +297,38 @@ View streak, XP, level
 
 # 📁 Project Structure
 
-```txt
-/app
-  page.js
-  layout.js
-
-  /leaderboard
-    page.js
-
-  /dashboard
-    page.js
-
-/components
-  Navbar.jsx
-  Leaderboard.jsx
-  DashboardCard.jsx
-
-/lib
-  supabaseClient.js
-
-/utils
-  auth.js
-
-/public
-  images/
-
-/styles
-  globals.css
+```text
+StreakVerse/
+├── app/                  # Next.js App Router (Pages & Layouts)
+│   ├── dashboard/        # User Arsenal (Private)
+│   │   └── page.js       # Dashboard implementation
+│   ├── leaderboard/      # Global Arena (Public)
+│   │   └── page.js       # Leaderboard implementation
+│   ├── layout.js         # Root Layout & Global Configurations
+│   └── page.js           # Home Page (Landing)
+├── components/           # Reusable UI Components
+│   ├── DashboardCard.jsx # Gamified Stat Cards
+│   ├── Leaderboard.jsx   # Rankings Logic & UI
+│   └── Sidebar.jsx       # Navigation Command Center
+├── lib/                  # Shared Library Instances
+│   └── supabaseClient.js # Supabase Client Initialization
+├── styles/               # Global CSS & Themes
+│   └── globals.css       # Custom Neon & Cyber Utilities
+├── utils/                # Helper Logic
+│   └── auth.js           # GitHub OAuth & Session Logic
+├── tailwind.config.ts    # Design System & Animations
+└── package.json          # Dependencies & Scripts
 ```
+
+### 🛠️ Core File Descriptions
+
+* **[`app/layout.js`](file:///c:/Users/yashs/OneDrive/Desktop/yash/project/StreakVerse/app/layout.js)**: Configures global fonts (**Orbitron** & **Space Grotesk**) and wraps the entire application with the [Sidebar.jsx](file:///c:/Users/yashs/OneDrive/Desktop/yash/project/StreakVerse/components/Sidebar.jsx).
+* **[`app/page.js`](file:///c:/Users/yashs/OneDrive/Desktop/yash/project/StreakVerse/app/page.js)**: The main entry point featuring the high-impact "Cyber-Arena" landing page.
+* **[`app/dashboard/page.js`](file:///c:/Users/yashs/OneDrive/Desktop/yash/project/StreakVerse/app/dashboard/page.js)**: Handles user authentication checks, fetches GitHub commit data, and calculates streaks/XP.
+* **[`components/Sidebar.jsx`](file:///c:/Users/yashs/OneDrive/Desktop/yash/project/StreakVerse/components/Sidebar.jsx)**: A complex navigation component that stays persistent and displays the user's current rank and level.
+* **[`components/Leaderboard.jsx`](file:///c:/Users/yashs/OneDrive/Desktop/yash/project/StreakVerse/components/Leaderboard.jsx)**: Fetches real-time profile data from Supabase and ranks users based on their performance.
+* **[`styles/globals.css`](file:///c:/Users/yashs/OneDrive/Desktop/yash/project/StreakVerse/styles/globals.css)**: Defines the custom "Cyber-Grid" background, neon glows, and glassmorphism styles used throughout the app.
+* **[`utils/auth.js`](file:///c:/Users/yashs/OneDrive/Desktop/yash/project/StreakVerse/utils/auth.js)**: A utility for managing Supabase authentication states and GitHub provider logic.
 
 ---
 
