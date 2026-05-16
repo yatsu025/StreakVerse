@@ -7,11 +7,7 @@ export default function LeaderboardPage() {
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="text-center mb-24">
-          <div className="flex items-center justify-center gap-6 mb-8">
-            <div className="h-[1px] w-12 bg-white/10" />
-            <span className="text-neon-orange text-[10px] font-black uppercase tracking-[0.5em]">Global Arena</span>
-            <div className="h-[1px] w-12 bg-white/10" />
-          </div>
+          
           
           <h1 className="text-6xl md:text-8xl font-display font-black tracking-tighter uppercase mb-8">
             ELITE <span className="text-neon-orange text-glow">RANKINGS</span>

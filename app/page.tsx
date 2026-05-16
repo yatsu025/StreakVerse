@@ -273,12 +273,17 @@ export default function Home() {
 
           {/* PLAYER STATS MINI HUD */}
           <div className={`${fade('delay-250')} flex flex-wrap justify-center gap-4 mb-12`}>
-            {[
+            {(!user ? [
               { label: 'CURRENT STREAK', value: '0 DAYS', color: '#FF6B35' },
               { label: 'GLOBAL RANK',    value: '#—',      color: '#B14AED' },
               { label: 'TOTAL XP',       value: '0',       color: '#FFD700' },
               { label: 'TIER',           value: 'ROOKIE',  color: '#00E5FF' },
-            ].map((s, i) => (
+            ] : [
+              { label: 'CURRENT STREAK', value: `${user?.user_metadata?.streak || 0} DAYS`, color: '#FF6B35' },
+              { label: 'GLOBAL RANK',    value: `#${user?.user_metadata?.rank || '—'}`,      color: '#B14AED' },
+              { label: 'TOTAL XP',       value: user?.user_metadata?.total_xp || '0',       color: '#FFD700' },
+              { label: 'TIER',           value: user?.user_metadata?.tier || 'ROOKIE',       color: '#00E5FF' },
+            ]).map((s, i) => (
               <StatChip key={i} label={s.label} value={s.value} color={s.color} />
             ))}
           </div>
@@ -316,23 +321,7 @@ export default function Home() {
         {/* ══════════════════════════════════════════ */}
         {/* ─────────────  STATS BAR  ──────────────── */}
         {/* ══════════════════════════════════════════ */}
-        <section className="py-16 px-6 relative" style={{ borderTop: '1px solid rgba(0,255,102,0.1)', borderBottom: '1px solid rgba(0,255,102,0.1)', background: 'rgba(0,255,102,0.01)' }}>
-          <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
-            {[
-              { val: '12K+',  label: 'ACTIVE PLAYERS',  color: '#00FF66', sub: 'ONLINE NOW' },
-              { val: '4.2M',  label: 'COMMITS LOGGED',  color: '#00E5FF', sub: 'ALL TIME' },
-              { val: '365D',  label: 'LONGEST STREAK',  color: '#B14AED', sub: 'SEASON RECORD' },
-              { val: 'FREE',  label: 'ENTRY COST',       color: '#FFD700', sub: 'PERMANENT LICENSE' },
-            ].map((s, i) => (
-              <div key={i} className="group text-center cursor-default">
-                <div className="text-[9px] font-mono-sv tracking-widest mb-2" style={{ color: `${s.color}66` }}>{s.sub}</div>
-                <div className="font-orbitron font-black mb-1 transition-all duration-300 group-hover:scale-110" style={{ fontSize: 'clamp(28px, 5vw, 48px)', color: s.color, textShadow: `0 0 30px ${s.color}44` }}>{s.val}</div>
-                <div className="text-[9px] font-mono-sv tracking-[0.3em]" style={{ color: 'rgba(255,255,255,0.3)' }}>{s.label}</div>
-                <div className="mt-3 h-px transition-all duration-500 group-hover:opacity-100 opacity-30" style={{ background: `linear-gradient(90deg, transparent, ${s.color}, transparent)` }} />
-              </div>
-            ))}
-          </div>
-        </section>
+        
 
         {/* ══════════════════════════════════════════ */}
         {/* ──────────────  MISSIONS  ──────────────── */}
@@ -550,24 +539,11 @@ export default function Home() {
                     >▶ {label}</Link>
                   ))}
                 </div>
-                <div className="flex flex-col gap-5">
-                  <span className="text-[9px] font-mono-sv tracking-[0.5em] pb-2" style={{ color: 'rgba(255,255,255,0.5)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>NETWORKS</span>
-                  {[['DISCORD', '#'], ['TWITTER', '#']].map(([label, href]) => (
-                    <a key={label} href={href} className="text-[10px] font-mono-sv tracking-widest transition-all hover:translate-x-1" style={{ color: 'rgba(255,255,255,0.3)' }}
-                      onMouseEnter={el => { (el.currentTarget as HTMLElement).style.color = '#00E5FF' }}
-                      onMouseLeave={el => { (el.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.3)' }}
-                    >▶ {label}</a>
-                  ))}
-                </div>
               </div>
             </div>
 
             <div className="mt-16 pt-8 flex flex-col sm:flex-row items-center justify-between gap-6" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
               <span className="text-[8px] font-mono-sv tracking-[0.3em]" style={{ color: 'rgba(255,255,255,0.15)' }}>© 2026 STREAKVERSE OS. ALL RIGHTS RESERVED.</span>
-              <div className="flex gap-8 text-[8px] font-mono-sv tracking-widest" style={{ color: 'rgba(255,255,255,0.15)' }}>
-                <a href="#" className="hover:text-white transition-colors">SECURITY PROTOCOL</a>
-                <a href="#" className="hover:text-white transition-colors">SERVICE TERMS</a>
-              </div>
             </div>
           </div>
         </footer>
