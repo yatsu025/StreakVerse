@@ -226,27 +226,7 @@ export default function Home() {
         ))}
       </div>
 
-      {/* ── HUD TOP BAR ── */}
-      <div className="fixed top-0 left-0 right-0 z-40 px-6 py-3" style={{ background: 'rgba(3,5,8,0.95)', borderBottom: '1px solid rgba(0,255,102,0.15)', backdropFilter: 'blur(20px)' }}>
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 flex items-center justify-center rounded" style={{ background: 'rgba(0,255,102,0.1)', border: '1px solid rgba(0,255,102,0.3)' }}>
-              <Skull className="w-4 h-4" style={{ color: '#00FF66' }} />
-            </div>
-            <span className="font-orbitron font-black text-lg tracking-wider" style={{ color: '#00FF66', textShadow: '0 0 20px rgba(0,255,102,0.5)' }}>
-              STREAK<span style={{ color: '#fff' }}>VERSE</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link href="/leaderboard" className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded text-[10px] font-mono-sv tracking-widest transition-all hover:scale-105" style={{ border: '1px solid rgba(255,107,53,0.3)', color: '#FF6B35', background: 'rgba(255,107,53,0.05)' }}>
-              <Trophy className="w-3 h-3" /><span>RANKINGS</span>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="relative z-10 pt-16">
+      <div className="relative z-10">
 
         {/* ══════════════════════════════════════════ */}
         {/* ──────────────  HERO  ─────────────────── */}

@@ -1,5 +1,5 @@
 import '../styles/globals.css'
-import Sidebar from '../components/Sidebar'
+import Navbar from '../components/Navbar'
 import { Orbitron, Space_Grotesk } from 'next/font/google'
 
 const orbitron = Orbitron({ 
@@ -21,8 +21,8 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${orbitron.variable} ${spaceGrotesk.variable}`}>
       <body className="antialiased font-body bg-black text-white min-h-screen">
-        <Sidebar />
-        <div className="sm:pl-80 min-h-screen transition-all duration-500">
+        <Navbar />
+        <div className="min-h-screen pt-20 transition-all duration-500">
           {children}
         </div>
       </body>
