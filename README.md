@@ -7,291 +7,47 @@
 # 📌 Project Overview
 
 **StreakVerse** is a web-based gamification platform designed to help developers maintain coding consistency.
-
 The platform connects with GitHub and transforms commit activity into a game-like experience.
 
-Users can:
-
-* Track coding streaks 🔥
-* Earn XP ⚡
-* Level up 🏆
-* Compete on leaderboards 📈
-* Stay motivated to code consistently 💻
-
-The primary objective of StreakVerse is:
-
-> **To motivate developers and beginners to code consistently through gamification.**
+### ✅ Done So Far:
+* **Navigation Fix**: Resolved overlapping navigation bars on the home page.
+* **Deployment Fix**: Fixed Vercel deployment issues by updating React 19 dependencies and resolving build-time linting/parsing errors.
+* **Core MVP**: Authentication, Streak Tracking, XP, and Leaderboard are fully functional.
 
 ---
 
-# 🎯 Problem Statement
+#  Tech Stack
 
-Many developers, especially beginners, struggle with coding consistency.
+## Frontend & Backend
+* **Next.js 15+** (App Router)
+* **React 19**
+* **Tailwind CSS**
 
-Common issues:
-
-* Lack of motivation
-* Irregular coding habits
-* No accountability system
-* GitHub contribution graph becomes inconsistent
-
-StreakVerse solves this problem by introducing:
-
-* Daily streak tracking
-* XP system
-* Competitive leaderboard
-* Progress visibility
-* Achievement-based motivation
+## Authentication & Database
+* **Supabase Auth** (GitHub OAuth)
+* **Supabase PostgreSQL**
 
 ---
 
-# 👥 Target Users
-
-### Primary Users
-
-* Beginner Developers
-* College Students
-* Self-taught Programmers
-* Developers building consistency
-
-### Secondary Users
-
-* Coding communities
-* Hackathon teams
-* Open-source contributors
-
----
-
-# 🧱 Tech Stack
-
-## Frontend
-
-* Next.js (App Router)
-* Tailwind CSS
-
-## Backend
-
-* Next.js API Routes
-
-## Authentication
-
-* Supabase Auth
-* GitHub OAuth
-
-## Database (Future)
-
-* Supabase PostgreSQL
-
-## Realtime (Future)
-
-* Supabase Realtime
-
-## External APIs
-
-* GitHub REST API
-
-## Deployment
-
-* Vercel
-
----
-
-# ⚙️ Core Features (MVP)
-
-## 1. GitHub Authentication
-
-### Description
-
-Users can securely log in using their GitHub account.
-
-### Flow
-
-1. User clicks **Login with GitHub**
-2. Redirect to GitHub OAuth page
-3. User authorizes access
-4. Redirect back to StreakVerse Dashboard
-
-### Tech
-
-* Supabase OAuth
-* GitHub Provider
-
-### Status
-
-✅ MVP
-
----
-
-## 2. Commit Streak Tracking
-
-### Description
-
-Tracks whether a user commits daily on GitHub.
-
-### Logic
-
-* At least 1 commit/day = streak +1
-* Miss a day = streak reset
-
-### Data Tracked
-
-* Current streak
-* Longest streak
-* Last commit date
-
-### Status
-
-✅ MVP
-
----
-
-## 3. XP System
-
-### Description
-
-Users earn XP based on coding consistency.
-
-### XP Logic
-
-Base XP:
-
-```txt
-1 valid coding day = 10 XP
-```
-
-Bonus XP:
-
-```txt
-5+ streak = +5 XP
-10+ streak = +10 XP
-```
-
-### Purpose
-
-Creates motivation loop.
-
-### Status
-
-✅ MVP
-
----
-
-## 4. Level System
-
-### Description
-
-Users progress through levels.
-
-### Level Mapping
-
-| XP Range | Level    |
-| -------- | -------- |
-| 0–100    | Beginner |
-| 100–300  | Coder    |
-| 300–700  | Hacker   |
-| 700+     | Legend   |
-
-### Status
-
-✅ MVP
-
----
-
-## 5. Public Leaderboard
-
-### Description
-
-Shows ranking of users.
-
-### Ranking Logic
-
-Priority:
-
-1. XP
-2. Current streak
-
-### Data Displayed
-
-* Rank
-* Username
-* Avatar
-* XP
-* Streak
-
-### Access
-
-Public page.
-
-No login required.
-
-### Status
-
-✅ MVP
-
----
-
-# 🔮 Future Features (Phase 2)
-
-## AI Commit Analysis
-
-Analyze commit quality.
-
-Examples:
-
-* Good commit ✅
-* Low-value commit ⚠️
-
-Purpose:
-Prevent fake streaks.
-
----
-
-## Challenges & Battles
-
-Competitive coding.
-
-Examples:
-
-* 1v1 coding battles
-* Weekly streak contests
-* Team competitions
-
----
-
-## Git City Visualization
-
-Gamified city system.
-
-Concept:
-
-* More commits → city grows
-* Broken streak → city damage
-
----
-
-# 🧠 User Flow
-
-## Public User Flow
-
-```txt
-Landing Page
-      ↓
-View Leaderboard
-```
-
-## Authenticated User Flow
-
-```txt
-Landing Page
-      ↓
-Login with GitHub
-      ↓
-GitHub OAuth
-      ↓
-Dashboard
-      ↓
-View streak, XP, level
-```
+# ⚙️ Core Features
+
+## 1. GitHub Authentication ✅
+* Secure login using GitHub account.
+* Automatic profile creation in Supabase.
+
+## 2. Commit Streak Tracking ✅
+* Tracks daily GitHub activity.
+* 1 commit/day = +1 streak.
+* Miss a day = streak reset.
+
+## 3. XP & Level System ✅
+* Earn XP for every active day.
+* Bonus XP for longer streaks.
+* Progress through tiers: **ROOKIE** → **SOLDIER** → **VETERAN** → **ELITE** → **LEGEND** → **MYTHIC**.
+
+## 4. Global Arena (Leaderboard) ✅
+* Real-time ranking of all developers.
+* Ranked by XP and Streak endurance.
 
 ---
 
@@ -299,105 +55,42 @@ View streak, XP, level
 
 ```text
 StreakVerse/
-├── app/                  # Next.js App Router (Pages & Layouts)
+├── app/                  # Next.js App Router
 │   ├── dashboard/        # User Arsenal (Private)
-│   │   └── page.js       # Dashboard implementation
+│   │   └── page.tsx      # Dashboard implementation
 │   ├── leaderboard/      # Global Arena (Public)
-│   │   └── page.js       # Leaderboard implementation
-│   ├── layout.js         # Root Layout & Global Configurations
-│   └── page.js           # Home Page (Landing)
+│   │   └── page.jsx      # Leaderboard implementation
+│   ├── layout.jsx        # Root Layout & Global Navbar
+│   └── page.tsx          # Home Page (Landing)
 ├── components/           # Reusable UI Components
 │   ├── DashboardCard.jsx # Gamified Stat Cards
 │   ├── Leaderboard.jsx   # Rankings Logic & UI
-│   └── Sidebar.jsx       # Navigation Command Center
+│   └── Navbar.tsx        # Global Navigation
 ├── lib/                  # Shared Library Instances
 │   └── supabaseClient.js # Supabase Client Initialization
 ├── styles/               # Global CSS & Themes
 │   └── globals.css       # Custom Neon & Cyber Utilities
 ├── utils/                # Helper Logic
 │   └── auth.js           # GitHub OAuth & Session Logic
-├── tailwind.config.ts    # Design System & Animations
 └── package.json          # Dependencies & Scripts
 ```
 
-### 🛠️ Core File Descriptions
+---
 
-* **[`app/layout.js`](file:///c:/Users/yashs/OneDrive/Desktop/yash/project/StreakVerse/app/layout.js)**: Configures global fonts (**Orbitron** & **Space Grotesk**) and wraps the entire application with the [Sidebar.jsx](file:///c:/Users/yashs/OneDrive/Desktop/yash/project/StreakVerse/components/Sidebar.jsx).
-* **[`app/page.js`](file:///c:/Users/yashs/OneDrive/Desktop/yash/project/StreakVerse/app/page.js)**: The main entry point featuring the high-impact "Cyber-Arena" landing page.
-* **[`app/dashboard/page.js`](file:///c:/Users/yashs/OneDrive/Desktop/yash/project/StreakVerse/app/dashboard/page.js)**: Handles user authentication checks, fetches GitHub commit data, and calculates streaks/XP.
-* **[`components/Sidebar.jsx`](file:///c:/Users/yashs/OneDrive/Desktop/yash/project/StreakVerse/components/Sidebar.jsx)**: A complex navigation component that stays persistent and displays the user's current rank and level.
-* **[`components/Leaderboard.jsx`](file:///c:/Users/yashs/OneDrive/Desktop/yash/project/StreakVerse/components/Leaderboard.jsx)**: Fetches real-time profile data from Supabase and ranks users based on their performance.
-* **[`styles/globals.css`](file:///c:/Users/yashs/OneDrive/Desktop/yash/project/StreakVerse/styles/globals.css)**: Defines the custom "Cyber-Grid" background, neon glows, and glassmorphism styles used throughout the app.
-* **[`utils/auth.js`](file:///c:/Users/yashs/OneDrive/Desktop/yash/project/StreakVerse/utils/auth.js)**: A utility for managing Supabase authentication states and GitHub provider logic.
+# 🚀 Getting Started
+
+1. **Clone the repo**
+2. **Install dependencies**: `npm install --legacy-peer-deps`
+3. **Set up .env**: Add your Supabase credentials.
+4. **Run dev server**: `npm run dev`
 
 ---
 
-# 🔐 Authentication Rules
+# 🌐 Deployment
 
-### Public Pages
+Deployed on **Vercel**. 
+*Note: Build uses `--legacy-peer-deps` to ensure React 19 compatibility with all UI libraries.*
 
-Accessible without login:
-
-```txt
-/
-/leaderboard
-```
-
-### Protected Pages
-
-Requires login:
-
-```txt
-/dashboard
-```
-
-### Redirect Logic
-
-If user not logged in:
-
-```txt
-/dashboard → /
-```
-
----
-
-# 🌐 API Requirements
-
-## GitHub API
-
-### Purpose
-
-Fetch commit activity.
-
-### Endpoint Example
-
-```txt
-https://api.github.com/users/{username}/events
-```
-
-### Required Data
-
-Filter:
-
-```txt
-PushEvent
-```
-
-Only PushEvent counts as commits.
-
----
-
-# 🗄️ Future Database Schema
-
-## Users Table
-
-```sql
-id UUID
-username TEXT
-email TEXT
-avatar_url TEXT
-xp INTEGER
-current_streak INTEGER
 longest_streak INTEGER
 last_commit_date DATE
 created_at TIMESTAMP
