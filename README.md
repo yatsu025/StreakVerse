@@ -10,9 +10,13 @@
 The platform connects with GitHub and transforms commit activity into a game-like experience.
 
 ### ✅ Done So Far:
-* **Navigation Fix**: Resolved overlapping navigation bars on the home page.
-* **Deployment Fix**: Fixed Vercel deployment issues by updating React 19 dependencies and resolving build-time linting/parsing errors.
-* **Core MVP**: Authentication, Streak Tracking, XP, and Leaderboard are fully functional.
+* **Architecture Refactor**: Implemented a fair, anti-abuse streak and XP system.
+* **Fair Streak Logic**: Requires 1+ commit per day; PushEvents only.
+* **Streak Shield**: Earn 1 shield every 7 days (max 3) to protect against resets.
+* **New XP System**: Balanced XP gains with streak bonuses (5, 10, 30 days).
+* **Rank Score Formula**: `xp + (current_streak * 5)` for competitive ranking.
+* **Periodic Sync**: Removed "real-time" wording for realistic periodic/manual syncing.
+* **UI Refresh**: Dashboard and Leaderboard updated with Tiers and Rank Scores.
 
 ---
 
@@ -36,18 +40,18 @@ The platform connects with GitHub and transforms commit activity into a game-lik
 * Automatic profile creation in Supabase.
 
 ## 2. Commit Streak Tracking ✅
-* Tracks daily GitHub activity.
-* 1 commit/day = +1 streak.
-* Miss a day = streak reset.
+* **Rule**: Minimum 1 commit per day (PushEvents only).
+* **Shields**: 1 shield earned every 7-day streak (Max 3). Shields prevent reset on missed days.
+* **Tracking**: Longest streak and last commit date logged.
 
-## 3. XP & Level System ✅
-* Earn XP for every active day.
-* Bonus XP for longer streaks.
-* Progress through tiers: **ROOKIE** → **SOLDIER** → **VETERAN** → **ELITE** → **LEGEND** → **MYTHIC**.
+## 3. XP & Rank System ✅
+* **XP**: +10 per valid day. Bonuses: 5d (+10), 10d (+20), 30d (+50).
+* **Rank Score**: `xp + (current_streak * 5)`.
+* **Tiers**: ROOKIE (0-100) → SOLDIER (101-250) → VETERAN (251-500) → ELITE (501-900) → LEGEND (901-1500) → MYTHIC (1501+).
 
-## 4. Global Arena (Leaderboard) ✅
-* Real-time ranking of all developers.
-* Ranked by XP and Streak endurance.
+## 4. Global Arena ✅
+* Periodic/Manual sync to prevent API abuse.
+* Leaderboard sorted by Rank Score, then XP, then Current Streak.
 
 ---
 

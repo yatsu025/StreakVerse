@@ -27,48 +27,25 @@ import {
   RefreshCw,
 } from 'lucide-react'
 
+import { calculateProgress, getTierFromXP, LEVELS, ProfileData } from '../../lib/streakUtils'
+
 /* ─────────────────────────────────────────────
    TYPE DEFINITIONS
 ───────────────────────────────────────────── */
-interface UserProfile {
-  id: string
-  username: string
-  avatar_url: string
-  xp: number
-  current_streak: number
-  // streak field as fallback in case column name differs
-  streak?: number
+interface UserProfile extends ProfileData {
+  streak?: number // fallback
 }
 
 /* ─────────────────────────────────────────────
    HELPERS
 ───────────────────────────────────────────── */
 
-/**
- * Level tier thresholds — XP / 100 + 1 is base level,
- * but we also derive a named TIER for display.
- */
-function getTierFromLevel(level: number): { tier: string; color: string; nextLevel: number } {
-  if (level >= 50) return { tier: 'MYTHIC',   color: '#FFD700', nextLevel: 100 }
-  if (level >= 30) return { tier: 'LEGEND',   color: '#FF6B35', nextLevel: 50  }
-  if (level >= 20) return { tier: 'ELITE',    color: '#B14AED', nextLevel: 30  }
-  if (level >= 10) return { tier: 'VETERAN',  color: '#00FF66', nextLevel: 20  }
-  if (level >= 5)  return { tier: 'SOLDIER',  color: '#00E5FF', nextLevel: 10  }
-  return             { tier: 'ROOKIE',    color: '#ffffff66', nextLevel: 5   }
-}
-
-/** XP needed for a given level */
-const xpForLevel = (l: number) => (l - 1) * 100
-
 /** Progress percentage inside current level (0–100) */
-function xpProgress(xp: number, level: number) {
-  const currentLevelXP = xpForLevel(level)
-  const nextLevelXP    = xpForLevel(level + 1)
+function xpProgress(xp: number, level: any) {
+  const currentLevelXP = level.minXP
+  const nextLevelXP    = level.maxXP === Infinity ? level.minXP + 1000 : level.maxXP
   return Math.min(100, ((xp - currentLevelXP) / (nextLevelXP - currentLevelXP)) * 100)
 }
-
-/** Streak-based shield count (1 shield per 7-day block, max 5) */
-const shieldsFromStreak = (streak: number) => Math.min(5, Math.floor(streak / 7))
 
 /* ─────────────────────────────────────────────
    SMALL UI COMPONENTS
@@ -151,36 +128,72 @@ export default function Dashboard() {
 
   /* ── AUTH CHECK ── */
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/')
-        return
+    let mounted = true
+    let authSub: any = null
+
+    const initialize = async () => {
+      try {
+        // 1. Get initial session
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (!mounted) return
+
+        if (!session?.user) {
+          router.push('/')
+          return
+        }
+
+        const user = session.user
+        setUser(user)
+
+        // 2. Load existing profile
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        if (mounted && profileData) {
+          setProfile(profileData)
+        }
+
+        // 3. Background Sync
+        if (user?.user_metadata?.user_name) {
+          fetchAndSyncGitHub(user, profileData)
+        }
+
+        // 4. Listen for changes (only after initial load)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, s) => {
+          if (!mounted) return
+          if (event === 'SIGNED_OUT') {
+            router.push('/')
+            return
+          }
+          if (s?.user) setUser(s.user)
+        })
+        authSub = subscription
+
+      } catch (err) {
+        console.error('Initialization error:', err)
+      } finally {
+        if (mounted) {
+          setLoading(false)
+          setTimeout(() => { if (mounted) setShow(true) }, 80)
+        }
       }
-      setUser(user)
-
-      // Load existing profile from Supabase first (fast render)
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      if (profileData) setProfile(profileData)
-
-      // Then sync fresh GitHub data in background
-      if (user?.user_metadata?.user_name) {
-        fetchAndSyncGitHub(user)
-      }
-
-      setLoading(false)
-      setTimeout(() => setShow(true), 80)
     }
-    checkUser()
+
+    initialize()
+
+    return () => { 
+      mounted = false 
+      if (authSub) authSub.unsubscribe()
+    }
   }, [router])
 
   /* ── GITHUB SYNC ── */
-  const fetchAndSyncGitHub = async (u: any) => {
+  const fetchAndSyncGitHub = async (u: any, currentProfile?: any) => {
+    if (syncing) return
     setSyncing(true)
     setSyncMsg('SYNCING GITHUB...')
     try {
@@ -192,7 +205,7 @@ export default function Dashboard() {
       const data       = await res.json()
       const pushEvents = Array.isArray(data) ? data.filter((e: any) => e.type === 'PushEvent') : []
 
-      await updateProfile(u, pushEvents)
+      await updateProfile(u, pushEvents, currentProfile || profile)
       setSyncMsg('SYNCED ✓')
     } catch (e: any) {
       console.error('GitHub sync error:', e.message)
@@ -204,38 +217,12 @@ export default function Dashboard() {
   }
 
   /* ── PROFILE UPDATE ── */
-  const updateProfile = async (u: any, pushEvents: any[]) => {
+  const updateProfile = async (u: any, pushEvents: any[], currentProfile?: any) => {
     try {
       const username   = u?.user_metadata?.user_name || u?.user_metadata?.full_name || 'anonymous'
       const avatar_url = u?.user_metadata?.avatar_url || ''
-      // XP = 10 per push event (each event can contain multiple commits)
-      const xp         = pushEvents.length * 10
-
-      // Build sorted unique commit dates (YYYY-MM-DD)
-      const commitDates = [
-        ...new Set(pushEvents.map((e: any) => e.created_at?.split('T')[0]).filter(Boolean))
-      ].sort() as string[]
-
-      // Calculate streak
-      let currentStreak = 0
-      if (commitDates.length > 0) {
-        const today     = new Date().toISOString().split('T')[0]
-        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
-        const lastDate  = commitDates[commitDates.length - 1]
-
-        // Streak is valid only if last commit was today or yesterday
-        if (lastDate === today || lastDate === yesterday) {
-          currentStreak = 1
-          for (let i = commitDates.length - 1; i > 0; i--) {
-            const curr = new Date(commitDates[i])
-            const prev = new Date(commitDates[i - 1])
-            const diffDays = Math.round(Math.abs(curr.getTime() - prev.getTime()) / 86400000)
-            if (diffDays === 1) currentStreak++
-            else break
-          }
-        }
-        // else streak = 0 because they missed days
-      }
+      
+      const newProgress = calculateProgress(currentProfile || profile, pushEvents)
 
       const { data, error } = await supabase
         .from('profiles')
@@ -243,8 +230,7 @@ export default function Dashboard() {
           id: u.id,
           username,
           avatar_url,
-          xp,
-          current_streak: currentStreak,
+          ...newProgress,
         })
         .select()
         .single()
@@ -259,30 +245,41 @@ export default function Dashboard() {
   /* ── LOADING SCREEN ── */
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#030508', fontFamily: "'Share Tech Mono', monospace" }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap'); .font-orbitron{font-family:'Orbitron',monospace;} .font-mono-sv{font-family:'Share Tech Mono',monospace;}`}</style>
-        <div className="flex flex-col items-center gap-6">
-          <div className="w-16 h-16 rounded flex items-center justify-center" style={{ border: '1px solid rgba(0,255,102,0.3)', background: 'rgba(0,255,102,0.05)' }}>
-            <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#00FF66' }} />
-          </div>
-          <div className="flex flex-col items-center gap-2">
-            <span className="font-orbitron font-black text-sm tracking-widest" style={{ color: '#00FF66' }}>LOADING ARSENAL</span>
-            <span className="text-[9px] font-mono-sv tracking-[0.5em]" style={{ color: 'rgba(255,255,255,0.2)' }}>CALIBRATING SYSTEMS...</span>
-          </div>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6" style={{ background: '#030508', fontFamily: "'Share Tech Mono', monospace" }}>
+        <div className="relative w-24 h-24">
+          <div className="absolute inset-0 border-2 border-[#00FF6622] rounded-full" />
+          <div className="absolute inset-0 border-t-2 border-[#00FF66] rounded-full animate-spin" />
+          <div className="absolute inset-4 border-2 border-[#00E5FF22] rounded-full" />
+          <div className="absolute inset-4 border-b-2 border-[#00E5FF] rounded-full animate-spin-slow" />
         </div>
+        <div className="flex flex-col items-center gap-2">
+          <div className="text-[10px] tracking-[0.6em] text-[#00FF66] animate-pulse">INITIALIZING ARSENAL...</div>
+          <div className="text-[8px] tracking-[0.3em] text-white/20">ACCESSING_ENCRYPTED_DATABASE</div>
+        </div>
+        
+        {/* Force entry button if stuck */}
+        <button 
+          onClick={() => setLoading(false)}
+          className="mt-8 px-4 py-2 text-[8px] font-mono-sv tracking-widest text-white/30 hover:text-white/60 transition-colors border border-white/10 rounded"
+        >
+          FORCE_INITIALIZATION [DEBUG]
+        </button>
       </div>
     )
   }
 
   if (!user) return null
 
-  /* ── DERIVED VALUES (all from Supabase profile or fallback 0) ── */
-  const streak  = profile?.current_streak ?? profile?.streak ?? 0
+  /* ── DERIVED VALUES ── */
+  const streak  = profile?.current_streak ?? 0
+  const longest = profile?.longest_streak ?? 0
   const xp      = profile?.xp ?? 0
-  const level   = Math.floor(xp / 100) + 1
-  const { tier, color: tierColor, nextLevel } = getTierFromLevel(level)
-  const xpPct   = xpProgress(xp, level)
-  const shields = shieldsFromStreak(streak)
+  const tierInfo = getTierFromXP(xp)
+  const tierColor = tierInfo.color
+  const xpPct   = xpProgress(xp, tierInfo)
+  const shields = profile?.streak_shields ?? 0
+  const rankScore = profile?.rank_score ?? 0
+  const lastSync = profile?.last_commit_date ? new Date(profile.last_commit_date).toLocaleDateString() : 'NEVER'
   const displayName = user.user_metadata?.full_name?.split(' ')[0] || profile?.username || 'RECRUIT'
   const githubName  = user.user_metadata?.user_name || profile?.username || 'unknown'
   const avatarUrl   = user.user_metadata?.avatar_url || profile?.avatar_url || ''
@@ -350,8 +347,8 @@ export default function Dashboard() {
                 </div>
                 {/* Level badge */}
                 <div className="absolute -bottom-3 -right-3 flex items-center gap-1 px-2.5 py-1 rounded" style={{ background: '#030508', border: `1px solid ${tierColor}55`, boxShadow: `0 0 12px ${tierColor}33` }}>
-                  <span className="text-[8px] font-mono-sv tracking-widest" style={{ color: `${tierColor}88` }}>LVL</span>
-                  <span className="text-sm font-orbitron font-black" style={{ color: tierColor }}>{level}</span>
+                  <span className="text-[8px] font-mono-sv tracking-widest" style={{ color: `${tierColor}88` }}>TIER</span>
+                  <span className="text-sm font-orbitron font-black" style={{ color: tierColor }}>{tierInfo.name}</span>
                 </div>
               </div>
 
@@ -359,7 +356,7 @@ export default function Dashboard() {
               <div className="flex-1 text-center md:text-left space-y-4 w-full">
                 <div>
                   <div className="text-[9px] font-mono-sv tracking-[0.6em] mb-2" style={{ color: 'rgba(0,229,255,0.5)' }}>
-                    ▶ PLAYER_IDENTITY_VERIFIED
+                    ▶ PLAYER_IDENTITY_VERIFIED | LAST_SYNC: {lastSync}
                   </div>
                   <h1 className="font-orbitron font-black leading-none" style={{ fontSize: 'clamp(26px, 5vw, 48px)', letterSpacing: '-0.02em' }}>
                     WELCOME,{' '}
@@ -372,7 +369,7 @@ export default function Dashboard() {
                 {/* Tags row */}
                 <div className="flex flex-wrap gap-3 justify-center md:justify-start">
                   <span className="flex items-center gap-1.5 text-[9px] font-mono-sv tracking-widest px-3 py-1.5 rounded" style={{ background: `${tierColor}12`, border: `1px solid ${tierColor}33`, color: tierColor }}>
-                    ◆ TIER: {tier}
+                    ◆ RANK_SCORE: {rankScore}
                   </span>
                   <span className="flex items-center gap-1.5 text-[9px] font-mono-sv tracking-widest px-3 py-1.5 rounded" style={{ background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.2)', color: '#00E5FF' }}>
                     <Github className="w-3 h-3" /> @{githubName}
@@ -388,25 +385,35 @@ export default function Dashboard() {
                 {/* XP Progress Bar */}
                 <div className="space-y-2 max-w-sm">
                   <div className="flex justify-between items-center">
-                    <span className="text-[8px] font-mono-sv tracking-widest" style={{ color: 'rgba(255,215,0,0.6)' }}>XP PROGRESS → LVL {level + 1}</span>
-                    <span className="text-[8px] font-mono-sv" style={{ color: '#FFD700' }}>{xp} / {xpForLevel(level + 1)} XP</span>
+                    <span className="text-[8px] font-mono-sv tracking-widest" style={{ color: 'rgba(255,215,0,0.6)' }}>XP PROGRESS → NEXT TIER</span>
+                    <span className="text-[8px] font-mono-sv" style={{ color: '#FFD700' }}>{xp} XP</span>
                   </div>
-                  <XPBar value={xp - xpForLevel(level)} max={xpForLevel(level + 1) - xpForLevel(level)} color="#FFD700" height={7} />
-                  <div className="text-[8px] font-mono-sv" style={{ color: 'rgba(255,255,255,0.2)' }}>{Math.round(xpPct)}% TO NEXT LEVEL</div>
+                  <XPBar value={xp - tierInfo.minXP} max={tierInfo.maxXP === Infinity ? 1000 : tierInfo.maxXP - tierInfo.minXP} color="#FFD700" height={7} />
+                  <div className="text-[8px] font-mono-sv" style={{ color: 'rgba(255,255,255,0.2)' }}>{Math.round(xpPct)}% TO NEXT TIER</div>
                 </div>
               </div>
 
-              {/* SIGN OUT */}
-              <button
-                onClick={async () => { await signOut(); window.location.href = '/' }}
-                className="flex items-center gap-2 px-5 py-3 text-[9px] font-mono-sv tracking-widest shrink-0 transition-all hover:scale-105"
-                style={{ border: '1px solid rgba(255,45,85,0.2)', color: 'rgba(255,45,85,0.5)', background: 'rgba(255,45,85,0.04)', clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#FF2D55'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,45,85,0.5)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,45,85,0.5)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,45,85,0.2)' }}
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                TERMINATE
-              </button>
+              {/* MANUAL SYNC BUTTON */}
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => user && fetchAndSyncGitHub(user)}
+                  disabled={syncing}
+                  className="flex items-center gap-2 px-5 py-3 text-[9px] font-mono-sv tracking-widest shrink-0 transition-all hover:scale-105"
+                  style={{ border: '1px solid rgba(0,255,102,0.2)', color: syncing ? '#00FF66' : 'rgba(0,255,102,0.5)', background: 'rgba(0,255,102,0.04)', clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))' }}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                  {syncing ? 'SYNCING...' : 'MANUAL_SYNC'}
+                </button>
+
+                <button
+                  onClick={async () => { await supabase.auth.signOut(); router.push('/') }}
+                  className="flex items-center gap-2 px-5 py-3 text-[9px] font-mono-sv tracking-widest shrink-0 transition-all hover:scale-105"
+                  style={{ border: '1px solid rgba(255,45,85,0.2)', color: 'rgba(255,45,85,0.5)', background: 'rgba(255,45,85,0.04)', clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))' }}
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  TERMINATE
+                </button>
+              </div>
             </div>
           </CornerCard>
         </div>
@@ -418,21 +425,21 @@ export default function Dashboard() {
           <StatCard
             label="EXPERIENCE POINTS"
             value={xp.toLocaleString()}
-            sub={`NEXT LVL: ${xpForLevel(level + 1) - xp} XP AWAY`}
+            sub={`RANK_SCORE: ${rankScore}`}
             icon={<Zap className="w-5 h-5" />}
             color="#B14AED"
           />
           <StatCard
             label="CURRENT STREAK"
             value={`${streak}D`}
-            sub={streak === 0 ? 'NO ACTIVE STREAK — COMMIT TODAY' : streak === 1 ? 'STREAK JUST STARTED' : `${shieldsFromStreak(streak)} SHIELDS FORGED`}
+            sub={`LONGEST: ${longest}D`}
             icon={<Flame className="w-5 h-5" />}
             color="#FF6B35"
           />
           <StatCard
-            label="PLAYER LEVEL"
-            value={`LVL ${level}`}
-            sub={`TIER: ${tier}`}
+            label="PLAYER TIER"
+            value={tierInfo.name}
+            sub={`${shields} SHIELDS ACTIVE`}
             icon={<Trophy className="w-5 h-5" />}
             color={tierColor}
           />

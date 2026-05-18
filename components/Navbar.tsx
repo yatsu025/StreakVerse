@@ -40,11 +40,23 @@ export default function Navbar() {
 
   /* ── EFFECTS — identical to original ── */
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setUser(s?.user ?? null))
-    const onScroll = () => setIsScrolled(window.scrollY > 20)
+    let mounted = true
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (mounted) {
+        setUser(session?.user ?? null)
+      }
+    })
+    
+    const onScroll = () => {
+      if (mounted) setIsScrolled(window.scrollY > 20)
+    }
     window.addEventListener('scroll', onScroll)
-    return () => { subscription.unsubscribe(); window.removeEventListener('scroll', onScroll) }
+    
+    return () => { 
+      mounted = false
+      subscription.unsubscribe()
+      window.removeEventListener('scroll', onScroll) 
+    }
   }, [])
 
   /* Close mobile menu on route change */

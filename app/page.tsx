@@ -32,15 +32,17 @@ import {
   Clock
 } from 'lucide-react'
 
+import { getTierFromXP, ProfileData } from '../lib/streakUtils'
+
 /* ─── DATA ────────────────────────────────────────────────── */
 
 const FEATURES = [
-  { icon: <Flame className="w-7 h-7" />, title: 'STREAK SYSTEM', desc: 'Sync your GitHub commits. Miss a day, and your flame dies. Stay consistent or reset to zero.', color: '#FF6B35', xp: '+500 XP' },
-  { icon: <Trophy className="w-7 h-7" />, title: 'GLOBAL ARENA', desc: 'Compete with top-tier developers. Climb the rankings and claim your legendary status.', color: '#00FF66', xp: '+750 XP' },
-  { icon: <LayoutDashboard className="w-7 h-7" />, title: 'ACTIVITY HUB', desc: 'Visualize your grind with high-fidelity heatmaps and real-time contribution tracking.', color: '#00E5FF', xp: '+300 XP' },
-  { icon: <Zap className="w-7 h-7" />, title: 'INSTANT SYNC', desc: 'Zero-latency GitHub integration. Your commits are tracked and logged the second you push.', color: '#B14AED', xp: '+200 XP' },
-  { icon: <Target className="w-7 h-7" />, title: 'ELITE MISSIONS', desc: 'Take on daily coding challenges. Complete objectives to earn massive XP multipliers.', color: '#FF2D55', xp: '+1000 XP' },
-  { icon: <ShieldCheck className="w-7 h-7" />, title: 'STREAK SHIELDS', desc: 'Forge shields through consistent performance. Protect your progress on critical off-days.', color: '#00E5FF', xp: '+400 XP' },
+  { icon: <Flame className="w-7 h-7" />, title: 'STREAK SYSTEM', desc: 'Maintain a 1-commit daily minimum. Miss a day? Shields up or reset to zero.', color: '#FF6B35', xp: '+10 XP/day' },
+  { icon: <Trophy className="w-7 h-7" />, title: 'GLOBAL ARENA', desc: 'Compete via Rank Score: XP + (Streak × 5). Climb the tiers to Mythic.', color: '#00FF66', xp: 'Rank formula' },
+  { icon: <LayoutDashboard className="w-7 h-7" />, title: 'ACTIVITY HUB', desc: 'Periodic sync logs your grind. Manual sync allowed every few hours.', color: '#00E5FF', xp: '+XP Bonuses' },
+  { icon: <Zap className="w-7 h-7" />, title: 'FAIR TRACKING', desc: 'Only PushEvents with valid commit sizes count. Anti-abuse protocol active.', color: '#B14AED', xp: 'Anti-Abuse' },
+  { icon: <Target className="w-7 h-7" />, title: 'ELITE MISSIONS', desc: 'Streak milestones (5, 10, 30 days) grant massive XP multipliers.', color: '#FF2D55', xp: 'Up to +50 XP' },
+  { icon: <ShieldCheck className="w-7 h-7" />, title: 'STREAK SHIELDS', desc: 'Earn 1 shield every 7 days. Max 3. Protects your streak on off-days.', color: '#00E5FF', xp: 'Max 3 Shields' },
 ]
 
 const MOCK_LEADERBOARD = [
@@ -117,6 +119,7 @@ function FloatingXP({ show, xp }: { show: boolean; xp: string }) {
 
 export default function Home() {
   const [user, setUser]           = useState<any>(null)
+  const [profile, setProfile]     = useState<ProfileData | null>(null)
   const [loading, setLoading]     = useState(true)
   const [show, setShow]           = useState(false)
   const [muted, setMuted]         = useState(true)
@@ -126,10 +129,52 @@ export default function Home() {
   const [scanline, setScanline]   = useState(true)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => { setUser(user); setLoading(false) })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setUser(s?.user ?? null))
-    const t = setTimeout(() => setShow(true), 100)
-    return () => { subscription.unsubscribe(); clearTimeout(t) }
+    let mounted = true
+    let authSub: any = null
+
+    const initialize = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!mounted) return
+        
+        if (session?.user) {
+          setUser(session.user)
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .maybeSingle()
+          if (mounted && profileData) setProfile(profileData)
+        }
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_e, s) => {
+          if (!mounted) return
+          setUser(s?.user ?? null)
+          if (s?.user) {
+            const { data: p } = await supabase.from('profiles').select('*').eq('id', s.user.id).maybeSingle()
+            if (mounted && p) setProfile(p)
+          } else {
+            setProfile(null)
+          }
+        })
+        authSub = subscription
+
+      } catch (err) {
+        console.error('Home initialization error:', err)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+
+    initialize()
+    
+    const t = setTimeout(() => { if (mounted) setShow(true) }, 100)
+    
+    return () => { 
+      mounted = false
+      if (authSub) authSub.unsubscribe()
+      clearTimeout(t) 
+    }
   }, [])
 
   const handleFeatureHover = (i: number) => {
@@ -273,19 +318,23 @@ export default function Home() {
 
           {/* PLAYER STATS MINI HUD */}
           <div className={`${fade('delay-250')} flex flex-wrap justify-center gap-4 mb-12`}>
-            {(!user ? [
-              { label: 'CURRENT STREAK', value: '0 DAYS', color: '#FF6B35' },
-              { label: 'GLOBAL RANK',    value: '#—',      color: '#B14AED' },
-              { label: 'TOTAL XP',       value: '0',       color: '#FFD700' },
-              { label: 'TIER',           value: 'ROOKIE',  color: '#00E5FF' },
-            ] : [
-              { label: 'CURRENT STREAK', value: `${user?.user_metadata?.streak || 0} DAYS`, color: '#FF6B35' },
-              { label: 'GLOBAL RANK',    value: `#${user?.user_metadata?.rank || '—'}`,      color: '#B14AED' },
-              { label: 'TOTAL XP',       value: user?.user_metadata?.total_xp || '0',       color: '#FFD700' },
-              { label: 'TIER',           value: user?.user_metadata?.tier || 'ROOKIE',       color: '#00E5FF' },
-            ]).map((s, i) => (
-              <StatChip key={i} label={s.label} value={s.value} color={s.color} />
-            ))}
+            {(() => {
+              const streak = profile?.current_streak ?? 0
+              const xp = profile?.xp ?? 0
+              const tierInfo = getTierFromXP(xp)
+              const rankScore = profile?.rank_score ?? 0
+              
+              const stats = [
+                { label: 'CURRENT STREAK', value: `${streak} DAYS`, color: '#FF6B35' },
+                { label: 'RANK SCORE',    value: rankScore > 0 ? rankScore.toLocaleString() : '#—', color: '#B14AED' },
+                { label: 'TOTAL XP',       value: xp.toLocaleString(), color: '#FFD700' },
+                { label: 'TIER',           value: tierInfo?.name || 'ROOKIE', color: tierInfo?.color || '#00E5FF' },
+              ]
+
+              return stats.map((s, i) => (
+                <StatChip key={i} label={s.label} value={s.value} color={s.color} />
+              ))
+            })()}
           </div>
 
           {/* CTA BUTTONS */}
@@ -332,9 +381,9 @@ export default function Home() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-20">
               {[
-                { n: '01', title: 'CONNECT CORE',  icon: <Zap className="w-7 h-7" />,       color: '#00FF66', desc: 'Link your GitHub identity. Our system monitors your activity in real-time across all repositories.', reward: '500 XP', difficulty: 'EASY' },
-                { n: '02', title: 'DAILY GRIND',   icon: <Crosshair className="w-7 h-7" />, color: '#FF6B35', desc: 'Push code daily. Each commit strengthens your streak. Let the flame die, and lose your rank.', reward: '150 XP/day', difficulty: 'MEDIUM' },
-                { n: '03', title: 'RANK UP',        icon: <Award className="w-7 h-7" />,     color: '#B14AED', desc: 'Climb the global arena. Earn elite badges, unlock shields, and establish your legacy.', reward: '2000 XP', difficulty: 'HARD' },
+                { n: '01', title: 'CONNECT CORE',  icon: <Zap className="w-7 h-7" />,       color: '#00FF66', desc: 'Link your GitHub identity. Our system monitors valid PushEvents periodically.', reward: '25 XP', difficulty: 'EASY' },
+                { n: '02', title: 'DAILY GRIND',   icon: <Crosshair className="w-7 h-7" />, color: '#FF6B35', desc: 'Push at least 1 commit daily. Each valid day strengthens your streak and rank.', reward: '10 XP/day', difficulty: 'MEDIUM' },
+                { n: '03', title: 'RANK UP',        icon: <Award className="w-7 h-7" />,     color: '#B14AED', desc: 'Climb via Rank Score: XP + (Streak × 5). Earn shields every 7 days.', reward: 'Tier Up', difficulty: 'HARD' },
               ].map((m, idx) => (
                 <PixelBorder key={idx} color={m.color} className="group cursor-default hover-lift p-8 relative overflow-hidden">
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background: `radial-gradient(circle at 50% 50%, ${m.color}08, transparent 70%)` }} />
