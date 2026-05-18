@@ -43,7 +43,9 @@ export function calculateProgress(
   pushEvents.forEach(event => {
     if (event.type === 'PushEvent') {
       const date = event.created_at.split('T')[0];
-      const commitCount = event.payload?.size || 0;
+      // Some PushEvents might report 0 size in certain API responses, 
+      // but the existence of a PushEvent itself is valid activity.
+      const commitCount = Math.max(1, event.payload?.size || event.payload?.distinct_size || 0);
       commitsByDate[date] = (commitsByDate[date] || 0) + commitCount;
     }
   });

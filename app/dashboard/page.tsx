@@ -195,24 +195,38 @@ export default function Dashboard() {
   const fetchAndSyncGitHub = async (u: any, currentProfile?: any) => {
     if (syncing) return
     setSyncing(true)
-    setSyncMsg('SYNCING GITHUB...')
+    setSyncMsg('CONNECTING TO GITHUB...')
     try {
       const username = u?.user_metadata?.user_name
-      const res      = await fetch(`https://api.github.com/users/${username}/events?per_page=100`)
+      // Use both events and repos/commits if possible, but for now let's log the data to debug
+      const res = await fetch(`https://api.github.com/users/${username}/events?per_page=100&t=${Date.now()}`)
 
       if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
 
-      const data       = await res.json()
+      const data = await res.json()
+      
       const pushEvents = Array.isArray(data) ? data.filter((e: any) => e.type === 'PushEvent') : []
+      
+      const today = new Date().toISOString().split('T')[0]
+      // GitHub events can be slightly delayed or use UTC. Let's also check yesterday to be safe for timezones
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+      
+      const todayCommits = pushEvents
+        .filter((e: any) => e.created_at.split('T')[0] === today)
+        .reduce((acc: number, e: any) => acc + (e.payload?.size || 0), 0)
 
-      await updateProfile(u, pushEvents, currentProfile || profile)
-      setSyncMsg('SYNCED ✓')
+      if (pushEvents.length === 0) {
+        setSyncMsg('NO RECENT PUSH_EVENTS FOUND (PUBLIC)')
+      } else {
+        await updateProfile(u, pushEvents, currentProfile || profile)
+        setSyncMsg(todayCommits > 0 ? `SYNCED: ${todayCommits} COMMITS DETECTED ✓` : 'SYNCED: NO NEW COMMITS TODAY ✓')
+      }
     } catch (e: any) {
       console.error('GitHub sync error:', e.message)
-      setSyncMsg('SYNC FAILED')
+      setSyncMsg('SYNC_PROTOCOL_FAILED')
     } finally {
       setSyncing(false)
-      setTimeout(() => setSyncMsg(''), 3000)
+      setTimeout(() => setSyncMsg(''), 5000)
     }
   }
 
@@ -374,6 +388,9 @@ export default function Dashboard() {
                   <span className="flex items-center gap-1.5 text-[9px] font-mono-sv tracking-widest px-3 py-1.5 rounded" style={{ background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.2)', color: '#00E5FF' }}>
                     <Github className="w-3 h-3" /> @{githubName}
                   </span>
+                  <div className="w-full md:w-auto text-[8px] font-mono-sv text-white/20 mt-1 md:mt-0 flex items-center gap-2">
+                    <AlertTriangle className="w-3 h-3" /> ONLY PUBLIC COMMITS ARE TRACKED CURRENTLY
+                  </div>
                   {syncMsg && (
                     <span className="flex items-center gap-1.5 text-[9px] font-mono-sv tracking-widest px-3 py-1.5 rounded" style={{ background: syncing ? 'rgba(255,215,0,0.08)' : syncMsg.includes('✓') ? 'rgba(0,255,102,0.08)' : 'rgba(255,45,85,0.08)', border: `1px solid ${syncing ? '#FFD70033' : syncMsg.includes('✓') ? '#00FF6633' : '#FF2D5533'}`, color: syncing ? '#FFD700' : syncMsg.includes('✓') ? '#00FF66' : '#FF2D55' }}>
                       {syncing && <RefreshCw className="w-3 h-3 animate-spin" />}

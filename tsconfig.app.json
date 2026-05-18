@@ -30,6 +30,13 @@
     "useDefineForClassFields": true
   },
   "include": [
-    "src"
+    "app",
+    "components",
+    "lib",
+    "utils",
+    "styles",
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx"
   ]
 }
