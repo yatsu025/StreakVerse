@@ -41,6 +41,7 @@ The platform connects with GitHub and transforms commit activity into a game-lik
 
 ## 2. Commit Streak Tracking ✅
 * **Rule**: Minimum 1 commit per day (PushEvents only).
+* **Penalty**: Missing a day (without shields) results in an **instant streak reset and -50 XP penalty**.
 * **Shields**: 1 shield earned every 7-day streak (Max 3). Shields prevent reset on missed days.
 * **Tracking**: Longest streak and last commit date logged.
 

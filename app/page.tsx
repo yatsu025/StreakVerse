@@ -37,7 +37,7 @@ import { getTierFromXP, ProfileData } from '../lib/streakUtils'
 /* ─── DATA ────────────────────────────────────────────────── */
 
 const FEATURES = [
-  { icon: <Flame className="w-7 h-7" />, title: 'STREAK SYSTEM', desc: 'Maintain a 1-commit daily minimum. Miss a day? Shields up or reset to zero.', color: '#FF6B35', xp: '+10 XP/day' },
+  { icon: <Flame className="w-7 h-7" />, title: 'STREAK SYSTEM', desc: 'Maintain a 1-commit daily minimum. Miss a day? Shields up or instant reset + 50 XP penalty.', color: '#FF6B35', xp: '+10 XP/day' },
   { icon: <Trophy className="w-7 h-7" />, title: 'GLOBAL ARENA', desc: 'Compete via Rank Score: XP + (Streak × 5). Climb the tiers to Mythic.', color: '#00FF66', xp: 'Rank formula' },
   { icon: <LayoutDashboard className="w-7 h-7" />, title: 'ACTIVITY HUB', desc: 'Periodic sync logs your grind. Manual sync allowed every few hours.', color: '#00E5FF', xp: '+XP Bonuses' },
   { icon: <Zap className="w-7 h-7" />, title: 'FAIR TRACKING', desc: 'Only PushEvents with valid commit sizes count. Anti-abuse protocol active.', color: '#B14AED', xp: 'Anti-Abuse' },

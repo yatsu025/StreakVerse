@@ -137,8 +137,14 @@ export function calculateProgress(
     const gap = diffDays - 1; // days since last valid commit that should have been active
     if (gap > 0) {
       if (shields >= gap) {
-        // Streak is still "active" but waiting for next commit
+        // Streak is still "active" because shields protected it
+        shields -= gap;
       } else {
+        // STREAK BREAK! 
+        // Penalty: Reset streak and deduct 50 XP if streak was active
+        if (currentStreak > 0 || (currentProfile?.current_streak || 0) > 0) {
+          xp = Math.max(0, xp - 50);
+        }
         shields = 0;
         currentStreak = 0;
       }
