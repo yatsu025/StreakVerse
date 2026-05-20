@@ -201,10 +201,10 @@ export async function calculateProgress(
   // ── Step 2: Process each date in chronological order ──────────────────────
   const sortedDates = [...commitsByDate.keys()].sort();
 
-  // Only process dates strictly after the last persisted commit date to
-  // avoid re-computing streak/XP for already-synced days.
+  // Only process dates strictly after OR equal to the last persisted commit date.
+  // Using strict > would skip today's commits if lastCommitDate is already today.
   const newDates = lastCommitDate
-    ? sortedDates.filter(d => d > lastCommitDate!)
+    ? sortedDates.filter(d => d >= lastCommitDate!)
     : sortedDates;
 
   for (const date of newDates) {
@@ -226,12 +226,10 @@ export async function calculateProgress(
       // but we must NOT award XP or streak again.
       if (lastCommitDate) {
         const gap = diffDays(lastCommitDate, date);
-        currentStreak = applyStreakTransition(
-          currentStreak, longestStreak, shields, gap
-        ).streak;
-        shields = applyStreakTransition(
-          currentStreak, longestStreak, shields, gap
-        ).shields;
+        // ✅ Call once, destructure both values together to avoid stale state
+        const transition = applyStreakTransition(currentStreak, longestStreak, shields, gap);
+        currentStreak = transition.streak;
+        shields       = transition.shields;
       }
       lastCommitDate = date;
       continue;
@@ -392,54 +390,3 @@ function applyStreakTransition(
   return { streak: 0, shields: 0, streakContinued: false };
 }
 
-// ─────────────────────────────────────────────
-// Database schema hint (Supabase / Postgres)
-// ─────────────────────────────────────────────
-//
-// Run this migration to enable commit deduplication:
-//
-//   CREATE TABLE IF NOT EXISTS processed_commits (
-//     id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-//     user_id      UUID        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-//     commit_sha   TEXT        NOT NULL,
-//     processed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-//     UNIQUE (user_id, commit_sha)
-//   );
-//
-//   CREATE INDEX IF NOT EXISTS idx_processed_commits_user
-//     ON processed_commits (user_id);
-//
-// Usage in your sync API route (Next.js example):
-//
-//   // 1. Fetch existing SHAs for this user
-//   const { data: rows } = await supabase
-//     .from('processed_commits')
-//     .select('commit_sha')
-//     .eq('user_id', userId);
-//
-//   const processedSHAs = new Set(rows?.map(r => r.commit_sha) ?? []);
-//
-//   // 2. Run calculation
-//   const { profileUpdate, newProcessedSHAs } = await calculateProgress({
-//     currentProfile,
-//     pushEvents,
-//     processedSHAs,
-//     fetchCommitDetail: async (owner, repo, sha) => {
-//       const res = await fetch(
-//         `https://api.github.com/repos/${owner}/${repo}/commits/${sha}`,
-//         { headers: { Authorization: `Bearer ${githubToken}` } }
-//       );
-//       return res.ok ? res.json() : null;
-//     },
-//   });
-//
-//   // 3. Upsert profile
-//   await supabase.from('profiles').update(profileUpdate).eq('id', userId);
-//
-//   // 4. Record new SHAs (ignore conflicts on duplicate)
-//   if (newProcessedSHAs.length > 0) {
-//     await supabase.from('processed_commits').upsert(
-//       newProcessedSHAs.map(sha => ({ user_id: userId, commit_sha: sha })),
-//       { onConflict: 'user_id,commit_sha' }
-//     );
-//   }

@@ -27,7 +27,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 
-import { calculateProgress, getTierFromXP, LEVELS, ProfileData } from '../../lib/streakUtils'
+import { getTierFromXP, LEVELS, ProfileData } from '../../lib/streakUtils'
 
 /* ─────────────────────────────────────────────
    TYPE DEFINITIONS
@@ -198,35 +198,44 @@ export default function Dashboard() {
     setSyncMsg('CONNECTING TO GITHUB...')
     try {
       const username = u?.user_metadata?.user_name
-      // Use both events and repos/commits if possible, but for now let's log the data to debug
-      const res = await fetch(`https://api.github.com/users/${username}/events?per_page=100&t=${Date.now()}`)
+      const res = await fetch(
+        `https://api.github.com/users/${username}/events?per_page=100`
+      )
 
       if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
 
       const data = await res.json()
-      
-      const pushEvents = Array.isArray(data) ? data.filter((e: any) => e.type === 'PushEvent') : []
-      
-      const today = new Date().toISOString().split('T')[0]
-      // GitHub events can be slightly delayed or use UTC. Let's also check yesterday to be safe for timezones
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
-      
-      const todayCommits = pushEvents
-        .filter((e: any) => e.created_at.split('T')[0] === today)
-        .reduce((acc: number, e: any) => acc + (e.payload?.size || 0), 0)
+      const pushEvents = Array.isArray(data)
+        ? data.filter((e: any) => e.type === 'PushEvent')
+        : []
+
+      console.log('[Sync] Total events:', data.length, '| PushEvents:', pushEvents.length)
 
       if (pushEvents.length === 0) {
-        setSyncMsg('NO RECENT PUSH_EVENTS FOUND (PUBLIC)')
-      } else {
-        await updateProfile(u, pushEvents, currentProfile || profile)
-        setSyncMsg(todayCommits > 0 ? `SYNCED: ${todayCommits} COMMITS DETECTED ✓` : 'SYNCED: NO NEW COMMITS TODAY ✓')
+        setSyncMsg('NO PUBLIC PUSH EVENTS FOUND — PRIVATE REPOS NOT TRACKED')
+        return
       }
+
+      const today = new Date().toISOString().split('T')[0]
+      const todayPushes = pushEvents.filter(
+        (e: any) => e.created_at.split('T')[0] === today
+      )
+
+      console.log('[Sync] Today pushes:', todayPushes.length)
+
+      await updateProfile(u, pushEvents, currentProfile || profile)
+
+      setSyncMsg(
+        todayPushes.length > 0
+          ? `SYNCED ✓ — ${todayPushes.length} PUSH EVENT(S) TODAY`
+          : 'SYNCED ✓ — NO PUSHES TODAY (STREAK MAINTAINED)'
+      )
     } catch (e: any) {
       console.error('GitHub sync error:', e.message)
-      setSyncMsg('SYNC_PROTOCOL_FAILED')
+      setSyncMsg('SYNC_FAILED: ' + e.message)
     } finally {
       setSyncing(false)
-      setTimeout(() => setSyncMsg(''), 5000)
+      setTimeout(() => setSyncMsg(''), 6000)
     }
   }
 
@@ -235,22 +244,139 @@ export default function Dashboard() {
     try {
       const username   = u?.user_metadata?.user_name || u?.user_metadata?.full_name || 'anonymous'
       const avatar_url = u?.user_metadata?.avatar_url || ''
-      
-      const newProgress = calculateProgress(currentProfile || profile, pushEvents)
+      const existing   = currentProfile || profile  // existing DB profile
 
+      // ── Step 1: Get all unique commit dates, sorted oldest → newest ───────
+      const commitDates: string[] = [
+        ...new Set(
+          pushEvents
+            .filter((e: any) => e.type === 'PushEvent')
+            .map((e: any) => e.created_at.split('T')[0])
+        ),
+      ].sort()
+
+      if (commitDates.length === 0) {
+        console.log('[Sync] No commit dates found in push events')
+        return
+      }
+
+      console.log('[Sync] Commit dates from GitHub:', commitDates)
+      console.log('[Sync] Existing profile:', existing)
+
+      // ── Step 2: Seed state from existing profile ──────────────────────────
+      // XP carries over — we only ADD xp for dates not yet counted.
+      // Streak is recalculated fresh from GitHub dates (always accurate).
+      const existingXP          = existing?.xp            ?? 0
+      const existingLastDate    = existing?.last_commit_date ?? null
+
+      // Dates that are strictly newer than what we've already processed
+      const newDates = existingLastDate
+        ? commitDates.filter((d: string) => d > existingLastDate)
+        : commitDates
+
+      console.log('[Sync] New dates to add XP for:', newDates)
+
+      // ── Step 3: Recalculate streak from ALL dates (always fresh) ──────────
+      let currentStreak = 0
+      let longestStreak = existing?.longest_streak ?? 0
+      let shields       = existing?.streak_shields  ?? 0
+      let lastDate: string | null = null
+
+      for (const date of commitDates) {
+        if (!lastDate) {
+          currentStreak = 1
+        } else {
+          const daysDiff = Math.round(
+            (new Date(date).getTime() - new Date(lastDate).getTime()) / 86_400_000
+          )
+          if (daysDiff === 0) continue          // same day, skip
+          else if (daysDiff === 1) currentStreak++ // consecutive
+          else currentStreak = 1                // gap — reset
+        }
+
+        if (currentStreak > longestStreak) longestStreak = currentStreak
+        lastDate = date
+      }
+
+      // Streak decay — if last commit wasn't today or yesterday
+      const today     = new Date().toISOString().split('T')[0]
+      const yesterday = new Date(Date.now() - 86_400_000).toISOString().split('T')[0]
+      if (lastDate && lastDate !== today && lastDate !== yesterday) {
+        currentStreak = 0
+      }
+
+      // ── Step 4: Add XP only for NEW dates ────────────────────────────────
+      let addedXP = 0
+
+      // First-time user bonus
+      if (!existing) addedXP += 25
+
+      for (const date of newDates) {
+        addedXP += 10  // +10 XP per new commit day
+
+        // We need streak value at this date for milestone bonuses
+        // Recalculate streak up to this date
+        let streakAtDate = 0
+        let prev: string | null = null
+        for (const d of commitDates) {
+          if (d > date) break
+          if (!prev) { streakAtDate = 1 }
+          else {
+            const diff = Math.round(
+              (new Date(d).getTime() - new Date(prev).getTime()) / 86_400_000
+            )
+            if (diff === 0) { prev = d; continue }
+            else if (diff === 1) streakAtDate++
+            else streakAtDate = 1
+          }
+          prev = d
+        }
+
+        if (streakAtDate === 5)  addedXP += 10
+        if (streakAtDate === 10) addedXP += 20
+        if (streakAtDate === 30) addedXP += 50
+
+        // Shield every 7 days (max 3) — only for new dates
+        if (streakAtDate > 0 && streakAtDate % 7 === 0) {
+          shields = Math.min(3, shields + 1)
+        }
+      }
+
+      const xp        = existingXP + addedXP
+      const rankScore = xp + currentStreak * 5
+
+      console.log('[Sync] Result:', {
+        existingXP,
+        addedXP,
+        xp,
+        currentStreak,
+        longestStreak,
+        shields,
+        lastDate,
+        rankScore,
+      })
+
+      // ── Step 5: Upsert to Supabase ────────────────────────────────────────
       const { data, error } = await supabase
         .from('profiles')
         .upsert({
           id: u.id,
           username,
           avatar_url,
-          ...newProgress,
+          xp,
+          current_streak:   currentStreak,
+          longest_streak:   longestStreak,
+          streak_shields:   shields,
+          last_commit_date: lastDate,
+          rank_score:       rankScore,
         })
         .select()
         .single()
 
       if (error) throw error
-      setProfile(data)          // update UI with fresh data from DB
+      setProfile(data)
+      console.log('[Sync] Saved to DB:', data)
+
     } catch (e: any) {
       console.error('Profile update error:', e.message)
     }
