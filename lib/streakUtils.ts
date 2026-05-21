@@ -1,14 +1,3 @@
-/**
- * StreakVerse Core Logic Utils
- * Handles XP, Streaks, Shields, Levels, and Ranking calculations.
- *
- * v2 — Commit-based XP + day-based streaks + processed_commits deduplication
- */
-
-// ─────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────
-
 export interface ProfileData {
   id: string;
   username: string;

@@ -244,39 +244,38 @@ export default function Dashboard() {
     try {
       const username   = u?.user_metadata?.user_name || u?.user_metadata?.full_name || 'anonymous'
       const avatar_url = u?.user_metadata?.avatar_url || ''
-      const existing   = currentProfile || profile  // existing DB profile
+      const existing   = currentProfile || profile
 
-      // ── Step 1: Get all unique commit dates, sorted oldest → newest ───────
-      const commitDates: string[] = [
-        ...new Set(
-          pushEvents
-            .filter((e: any) => e.type === 'PushEvent')
-            .map((e: any) => e.created_at.split('T')[0])
-        ),
-      ].sort()
+      const today     = new Date().toISOString().split('T')[0]
+      const yesterday = new Date(Date.now() - 86_400_000).toISOString().split('T')[0]
+
+      // ── Step 1: Count commits per date from GitHub events ─────────────────
+      // commitCountByDate = { "2025-05-20": 3, "2025-05-19": 1, ... }
+      const commitCountByDate: Record<string, number> = {}
+
+      for (const event of pushEvents) {
+        if (event.type !== 'PushEvent') continue
+        const date = event.created_at.split('T')[0]
+        const count = event.payload?.commits?.length ?? event.payload?.size ?? 1
+        commitCountByDate[date] = (commitCountByDate[date] ?? 0) + count
+      }
+
+      const commitDates = Object.keys(commitCountByDate).sort()
 
       if (commitDates.length === 0) {
-        console.log('[Sync] No commit dates found in push events')
+        console.log('[Sync] No commit dates found')
         return
       }
 
-      console.log('[Sync] Commit dates from GitHub:', commitDates)
-      console.log('[Sync] Existing profile:', existing)
+      console.log('[Sync] Commits per date:', commitCountByDate)
+      console.log('[Sync] Existing profile:', {
+        xp: existing?.xp,
+        streak: existing?.current_streak,
+        lastDate: existing?.last_commit_date,
+        lastCount: existing?.last_commit_count,
+      })
 
-      // ── Step 2: Seed state from existing profile ──────────────────────────
-      // XP carries over — we only ADD xp for dates not yet counted.
-      // Streak is recalculated fresh from GitHub dates (always accurate).
-      const existingXP          = existing?.xp            ?? 0
-      const existingLastDate    = existing?.last_commit_date ?? null
-
-      // Dates that are strictly newer than what we've already processed
-      const newDates = existingLastDate
-        ? commitDates.filter((d: string) => d > existingLastDate)
-        : commitDates
-
-      console.log('[Sync] New dates to add XP for:', newDates)
-
-      // ── Step 3: Recalculate streak from ALL dates (always fresh) ──────────
+      // ── Step 2: Recalculate streak from ALL dates ─────────────────────────
       let currentStreak = 0
       let longestStreak = existing?.longest_streak ?? 0
       let shields       = existing?.streak_shields  ?? 0
@@ -289,33 +288,51 @@ export default function Dashboard() {
           const daysDiff = Math.round(
             (new Date(date).getTime() - new Date(lastDate).getTime()) / 86_400_000
           )
-          if (daysDiff === 0) continue          // same day, skip
-          else if (daysDiff === 1) currentStreak++ // consecutive
-          else currentStreak = 1                // gap — reset
+          if (daysDiff === 0) continue
+          else if (daysDiff === 1) currentStreak++
+          else currentStreak = 1
         }
-
         if (currentStreak > longestStreak) longestStreak = currentStreak
         lastDate = date
       }
 
-      // Streak decay — if last commit wasn't today or yesterday
-      const today     = new Date().toISOString().split('T')[0]
-      const yesterday = new Date(Date.now() - 86_400_000).toISOString().split('T')[0]
+      // Streak decay
       if (lastDate && lastDate !== today && lastDate !== yesterday) {
         currentStreak = 0
       }
 
-      // ── Step 4: Add XP only for NEW dates ────────────────────────────────
+      // ── Step 3: Calculate XP ──────────────────────────────────────────────
+      // Strategy:
+      //   - existingXP = XP already in DB (carry forward always)
+      //   - For each NEW date (d > existingLastDate): +10 day bonus
+      //   - For TODAY specifically: compare total commits today vs
+      //     last_commit_count stored in DB — give +5 XP per new commit
+      //
+      // We store last_commit_count as a number in the profile to track
+      // how many commits were counted last time for today.
+
+      const existingXP         = existing?.xp                ?? 0
+      // Normalize existingLastDate to just YYYY-MM-DD
+      const rawLastDate        = existing?.last_commit_date   ?? null
+      const existingLastDate   = rawLastDate ? rawLastDate.split('T')[0] : null
+      const existingLastCount  = existing?.last_commit_count  ?? 0  // commits counted last sync
+
+      const newDates = existingLastDate
+        ? commitDates.filter((d: string) => d > existingLastDate)
+        : commitDates
+
+      console.log('[Sync] existingLastDate:', existingLastDate, '| newDates:', newDates)
+
       let addedXP = 0
 
       // First-time user bonus
       if (!existing) addedXP += 25
 
+      // Day bonus for each brand-new date
       for (const date of newDates) {
-        addedXP += 10  // +10 XP per new commit day
+        addedXP += 10
 
-        // We need streak value at this date for milestone bonuses
-        // Recalculate streak up to this date
+        // Streak milestone bonuses
         let streakAtDate = 0
         let prev: string | null = null
         for (const d of commitDates) {
@@ -326,37 +343,47 @@ export default function Dashboard() {
               (new Date(d).getTime() - new Date(prev).getTime()) / 86_400_000
             )
             if (diff === 0) { prev = d; continue }
-            else if (diff === 1) streakAtDate++
-            else streakAtDate = 1
+            streakAtDate = diff === 1 ? streakAtDate + 1 : 1
           }
           prev = d
         }
-
         if (streakAtDate === 5)  addedXP += 10
         if (streakAtDate === 10) addedXP += 20
         if (streakAtDate === 30) addedXP += 50
-
-        // Shield every 7 days (max 3) — only for new dates
         if (streakAtDate > 0 && streakAtDate % 7 === 0) {
           shields = Math.min(3, shields + 1)
         }
       }
 
+      // Additional commits today (+5 XP each beyond what was already counted)
+      const totalCommitsToday = commitCountByDate[today] ?? 0
+      const prevCountedToday  = existingLastDate === today ? existingLastCount : 0
+      const newCommitsToday   = Math.max(0, totalCommitsToday - prevCountedToday)
+
+      // If today is a new date, first commit already got day bonus (+10)
+      // so additional commits start from index 1
+      const isTodayNew = newDates.includes(today)
+      const extraCommits = isTodayNew
+        ? Math.max(0, newCommitsToday - 1)   // first commit covered by day bonus
+        : newCommitsToday                     // all are additional
+
+      addedXP += extraCommits * 5
+
+      console.log('[Sync] Today commits:', {
+        totalCommitsToday,
+        prevCountedToday,
+        newCommitsToday,
+        isTodayNew,
+        extraCommits,
+        extraXP: extraCommits * 5,
+      })
+
       const xp        = existingXP + addedXP
       const rankScore = xp + currentStreak * 5
 
-      console.log('[Sync] Result:', {
-        existingXP,
-        addedXP,
-        xp,
-        currentStreak,
-        longestStreak,
-        shields,
-        lastDate,
-        rankScore,
-      })
+      console.log('[Sync] Final:', { existingXP, addedXP, xp, currentStreak, longestStreak, lastDate, rankScore })
 
-      // ── Step 5: Upsert to Supabase ────────────────────────────────────────
+      // ── Step 4: Upsert to Supabase ────────────────────────────────────────
       const { data, error } = await supabase
         .from('profiles')
         .upsert({
@@ -364,11 +391,12 @@ export default function Dashboard() {
           username,
           avatar_url,
           xp,
-          current_streak:   currentStreak,
-          longest_streak:   longestStreak,
-          streak_shields:   shields,
-          last_commit_date: lastDate,
-          rank_score:       rankScore,
+          current_streak:     currentStreak,
+          longest_streak:     longestStreak,
+          streak_shields:     shields,
+          last_commit_date:   lastDate,
+          last_commit_count:  totalCommitsToday,  // store today's count for next sync
+          rank_score:         rankScore,
         })
         .select()
         .single()
