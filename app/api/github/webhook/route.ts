@@ -16,11 +16,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
-// ── Supabase admin client (service role — bypasses RLS) ──────────────────────
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!   // add this to .env
-)
+// ── Supabase client — lazy init at request time, not build time ───────────────
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!url || !key) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars')
+  }
+
+  return createClient(url, key)
+}
 
 // ── Verify GitHub webhook signature ──────────────────────────────────────────
 function verifySignature(body: string, signature: string | null, secret: string): boolean {
@@ -95,6 +101,7 @@ export async function POST(req: NextRequest) {
     console.log('[Webhook] Push from:', pusherLogin)
 
     // 3. Find the user in Supabase by GitHub username
+    const supabase = getSupabase()
     const { data: profileData, error: profileErr } = await supabase
       .from('profiles')
       .select('*')
