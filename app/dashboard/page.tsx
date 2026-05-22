@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import { signOut } from '../../utils/auth'
@@ -126,16 +126,22 @@ export default function Dashboard() {
   const [show, setShow]         = useState(false)
   const router                  = useRouter()
 
-  /* ── AUTH CHECK ── */
+  // Keep a ref to user so polling interval can access latest value
+  const userRef    = useRef<any>(null)
+  const profileRef = useRef<UserProfile | null>(null)
+
+  useEffect(() => { userRef.current    = user    }, [user])
+  useEffect(() => { profileRef.current = profile }, [profile])
+
+  /* ── AUTH CHECK + AUTO POLL ── */
   useEffect(() => {
-    let mounted = true
-    let authSub: any = null
+    let mounted  = true
+    let authSub: any  = null
+    let pollTimer: ReturnType<typeof setInterval> | null = null
 
     const initialize = async () => {
       try {
-        // 1. Get initial session
         const { data: { session } } = await supabase.auth.getSession()
-        
         if (!mounted) return
 
         if (!session?.user) {
@@ -145,8 +151,9 @@ export default function Dashboard() {
 
         const user = session.user
         setUser(user)
+        userRef.current = user
 
-        // 2. Load existing profile
+        // Load existing profile
         const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
@@ -155,21 +162,28 @@ export default function Dashboard() {
 
         if (mounted && profileData) {
           setProfile(profileData)
+          profileRef.current = profileData
         }
 
-        // 3. Background Sync
+        // Initial sync on load
         if (user?.user_metadata?.user_name) {
           fetchAndSyncGitHub(user, profileData)
         }
 
-        // 4. Listen for changes (only after initial load)
+        // ── Auto-poll every 5 minutes ──────────────────────────────────────
+        // Silently re-syncs in background — no spinner, no message.
+        // This catches pushes that happened while the tab was open.
+        pollTimer = setInterval(() => {
+          if (!mounted || !userRef.current?.user_metadata?.user_name) return
+          console.log('[AutoSync] Polling GitHub...')
+          fetchAndSyncGitHub(userRef.current, profileRef.current, true /* silent */)
+        }, 5 * 60 * 1000) // every 5 minutes
+
+        // Auth state listener
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, s) => {
           if (!mounted) return
-          if (event === 'SIGNED_OUT') {
-            router.push('/')
-            return
-          }
-          if (s?.user) setUser(s.user)
+          if (event === 'SIGNED_OUT') { router.push('/'); return }
+          if (s?.user) { setUser(s.user); userRef.current = s.user }
         })
         authSub = subscription
 
@@ -185,17 +199,18 @@ export default function Dashboard() {
 
     initialize()
 
-    return () => { 
-      mounted = false 
-      if (authSub) authSub.unsubscribe()
+    return () => {
+      mounted = false
+      if (authSub)    authSub.unsubscribe()
+      if (pollTimer)  clearInterval(pollTimer)
     }
   }, [router])
 
   /* ── GITHUB SYNC ── */
-  const fetchAndSyncGitHub = async (u: any, currentProfile?: any) => {
+  const fetchAndSyncGitHub = async (u: any, currentProfile?: any, silent = false) => {
     if (syncing) return
     setSyncing(true)
-    setSyncMsg('CONNECTING TO GITHUB...')
+    if (!silent) setSyncMsg('CONNECTING TO GITHUB...')
     try {
       const username = u?.user_metadata?.user_name
       const res = await fetch(
@@ -212,7 +227,7 @@ export default function Dashboard() {
       console.log('[Sync] Total events:', data.length, '| PushEvents:', pushEvents.length)
 
       if (pushEvents.length === 0) {
-        setSyncMsg('NO PUBLIC PUSH EVENTS FOUND — PRIVATE REPOS NOT TRACKED')
+        if (!silent) setSyncMsg('NO PUBLIC PUSH EVENTS FOUND — PRIVATE REPOS NOT TRACKED')
         return
       }
 
@@ -225,17 +240,17 @@ export default function Dashboard() {
 
       await updateProfile(u, pushEvents, currentProfile || profile)
 
-      setSyncMsg(
+      if (!silent) setSyncMsg(
         todayPushes.length > 0
           ? `SYNCED ✓ — ${todayPushes.length} PUSH EVENT(S) TODAY`
           : 'SYNCED ✓ — NO PUSHES TODAY (STREAK MAINTAINED)'
       )
     } catch (e: any) {
       console.error('GitHub sync error:', e.message)
-      setSyncMsg('SYNC_FAILED: ' + e.message)
+      if (!silent) setSyncMsg('SYNC_FAILED: ' + e.message)
     } finally {
       setSyncing(false)
-      setTimeout(() => setSyncMsg(''), 6000)
+      if (!silent) setTimeout(() => setSyncMsg(''), 6000)
     }
   }
 
