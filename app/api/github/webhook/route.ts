@@ -1,17 +1,3 @@
-/**
- * POST /api/github/webhook
- *
- * GitHub sends a push event here whenever the user pushes to any repo.
- * We verify the signature, then sync XP + streak for that user.
- *
- * Setup (one-time per user):
- *   GitHub → Settings → Webhooks → Add webhook
- *   Payload URL : https://your-domain.com/api/github/webhook
- *   Content type: application/json
- *   Secret      : same value as GITHUB_WEBHOOK_SECRET in .env
- *   Events      : Just the push event
- */
-
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
