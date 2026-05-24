@@ -16,7 +16,7 @@
 - Next.js 15 App Router + React 19 + Tailwind CSS
 - GitHub OAuth via Supabase Auth
 - Supabase PostgreSQL database
-- Deployed on **Vercel**
+
 
 ### Authentication
 - GitHub OAuth login
