@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '../../lib/supabaseClient'
 import { signOut } from '../../utils/auth'
 import {
@@ -722,25 +723,29 @@ export default function Dashboard() {
             ACTIVITY GRID (2 locked panels)
         ══════════════════════════════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" style={fade(300)}>
-          {/* Activity Visualizer */}
-          <CornerCard color="#00FF66" className="p-10 flex flex-col items-center justify-center text-center gap-7 min-h-[320px] relative overflow-hidden group">
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700" style={{ background: 'radial-gradient(circle at 50% 50%, rgba(0,255,102,0.04), transparent 60%)' }} />
-            <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(0,255,102,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,102,0.03) 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
-            <div className="w-16 h-16 rounded flex items-center justify-center relative z-10 transition-transform duration-300 group-hover:scale-110"
-              style={{ background: 'rgba(0,255,102,0.05)', border: '1px solid rgba(0,255,102,0.15)' }}>
-              <LayoutDashboard className="w-8 h-8" style={{ color: 'rgba(0,255,102,0.4)' }} />
-            </div>
-            <div className="relative z-10 space-y-3">
-              <div className="font-orbitron font-black text-xl tracking-tight" style={{ color: 'rgba(255,255,255,0.7)' }}>ACTIVITY VISUALIZER</div>
-              <p className="font-rajdhani text-sm leading-relaxed max-w-xs mx-auto" style={{ color: 'rgba(255,255,255,0.25)' }}>
-                Neural contribution heatmap. Real-time commit tracking across all repositories.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded relative z-10" style={{ background: 'rgba(255,215,0,0.06)', border: '1px solid rgba(255,215,0,0.15)' }}>
-              <AlertTriangle className="w-3.5 h-3.5" style={{ color: '#FFD70088' }} />
-              <span className="text-[8px] font-mono-sv tracking-widest" style={{ color: '#FFD70088' }}>DEPLOYING SOON</span>
-            </div>
-          </CornerCard>
+          {/* Activity Visualizer — now a real link */}
+          <Link href="/dashboard/activity" className="block">
+            <CornerCard color="#00FF66" className="p-10 flex flex-col items-center justify-center text-center gap-7 min-h-[320px] relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-transform duration-200">
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700" style={{ background: 'radial-gradient(circle at 50% 50%, rgba(0,255,102,0.06), transparent 60%)' }} />
+              <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(0,255,102,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,102,0.03) 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+              <div className="w-16 h-16 rounded flex items-center justify-center relative z-10 transition-transform duration-300 group-hover:scale-110"
+                style={{ background: 'rgba(0,255,102,0.08)', border: '1px solid rgba(0,255,102,0.3)' }}>
+                <LayoutDashboard className="w-8 h-8" style={{ color: '#00FF66' }} />
+              </div>
+              <div className="relative z-10 space-y-3">
+                <div className="font-orbitron font-black text-xl tracking-tight" style={{ color: 'rgba(255,255,255,0.9)' }}>ACTIVITY VISUALIZER</div>
+                <p className="font-rajdhani text-sm leading-relaxed max-w-xs mx-auto" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  Date-wise commit history. See your XP earned, streak, and rank score for every day you coded.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 rounded relative z-10 group-hover:border-[#00FF6644] transition-colors"
+                style={{ background: 'rgba(0,255,102,0.06)', border: '1px solid rgba(0,255,102,0.2)' }}>
+                <span className="text-[8px] font-mono-sv tracking-widest" style={{ color: '#00FF6688' }}>
+                  VIEW HISTORY →
+                </span>
+              </div>
+            </CornerCard>
+          </Link>
 
           {/* Mission Hub */}
           <CornerCard color="#B14AED" className="p-10 flex flex-col items-center justify-center text-center gap-7 min-h-[320px] relative overflow-hidden group">
