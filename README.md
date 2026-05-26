@@ -243,7 +243,8 @@ Now every push to that repo instantly updates XP + streak — no manual sync nee
 - [x] Vercel deployment
 
 ### Phase 2 — Coming Soon
-- [ ] Team streaks & battles
+- [x] History of commit & strike
+- [ ] Team streaks & battles.
 - [ ] Activity heatmap (GitHub-style contribution grid)
 - [ ] Rewards & badges system
 - [ ] Private repo support (via GitHub App)
