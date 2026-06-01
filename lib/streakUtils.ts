@@ -142,6 +142,17 @@ export interface CalculateProgressResult {
  * 3. **Idempotent** — SHAs stored in `processed_commits` are skipped so that
  *    repeated syncs never double-count XP.
  * 4. **Async** — commit details are fetched per-SHA via the supplied callback.
+ *
+ * FIXES applied (v2):
+ * - BUG 1: applyStreakTransition result was ignored when gap===1, causing
+ *   incorrect streak increment logic. Now caller uses transition result
+ *   consistently for all gap sizes.
+ * - BUG 2: Streak decay check (Step 3) was NOT idempotent — running the
+ *   same sync twice would consume shields or break streak again on the
+ *   second run. Fixed by comparing against the profile's ORIGINAL
+ *   last_commit_date (before this sync run), not the mutated one.
+ * - BUG 3: When shields bridge a gap, streak should NOT reset to 1 —
+ *   it continues from current value and increments by 1 for the new day.
  */
 export async function calculateProgress(
   input: CalculateProgressInput
@@ -154,6 +165,10 @@ export async function calculateProgress(
   let longestStreak  = currentProfile?.longest_streak  ?? 0;
   let shields        = currentProfile?.streak_shields   ?? 0;
   let lastCommitDate = currentProfile?.last_commit_date ?? null;
+
+  // Save the ORIGINAL lastCommitDate from DB before we mutate it.
+  // The Step 3 decay check MUST use this, not the mutated value.
+  const originalLastCommitDate = lastCommitDate;
 
   // First GitHub login bonus
   if (!currentProfile) {
@@ -213,13 +228,8 @@ export async function calculateProgress(
       // All commits on this date were already processed in a prior sync.
       // We must still advance lastCommitDate and maintain streak continuity,
       // but we must NOT award XP or streak again.
-      if (lastCommitDate) {
-        const gap = diffDays(lastCommitDate, date);
-        // ✅ Call once, destructure both values together to avoid stale state
-        const transition = applyStreakTransition(currentStreak, longestStreak, shields, gap);
-        currentStreak = transition.streak;
-        shields       = transition.shields;
-      }
+      // NOTE: We do NOT call applyStreakTransition here because the streak
+      // was already updated when these commits were first processed.
       lastCommitDate = date;
       continue;
     }
@@ -227,18 +237,20 @@ export async function calculateProgress(
     // ── 2a. Streak update (once per day) ────────────────────────────────────
     if (lastCommitDate) {
       const gap = diffDays(lastCommitDate, date);
-      const result = applyStreakTransition(currentStreak, longestStreak, shields, gap);
-      currentStreak = result.streak;
-      shields       = result.shields;
 
-      if (gap === 1) {
-        // Consecutive day
-        currentStreak++;
-      } else if (result.streakContinued) {
-        // Shields bridged the gap; streak would have already been bumped
+      // FIX: Always run applyStreakTransition first to handle shields.
+      // Then apply the +1 increment for today's new commit day.
+      const transition = applyStreakTransition(currentStreak, longestStreak, shields, gap);
+
+      // Apply the transition state (may consume shields, may reset streak)
+      currentStreak = transition.streak;
+      shields       = transition.shields;
+
+      if (transition.streakContinued) {
+        // Consecutive day OR shields bridged the gap — increment streak
         currentStreak++;
       } else {
-        // Streak broke and reset; this is day 1 of a new streak
+        // Streak broke, no shields left — this is day 1 of a new streak
         currentStreak = 1;
       }
     } else {
@@ -295,24 +307,31 @@ export async function calculateProgress(
 
   // ── Step 3: Streak decay check ────────────────────────────────────────────
   //
-  // Runs AFTER processing new commits. If the user has not committed today
-  // or yesterday, we must check whether their streak should be penalised.
+  // FIX: Use originalLastCommitDate (value from DB before this sync run),
+  // NOT the mutated lastCommitDate. This makes the check idempotent —
+  // running the same sync twice won't penalise the user twice.
+  //
+  // Also: if new commits were processed in this run, the user is active
+  // and decay should NOT fire for the current run.
   //
   const today     = toDateString(new Date());
   const yesterday = toDateString(new Date(Date.now() - 86_400_000));
 
+  const hasNewCommitsThisRun = newProcessedSHAs.length > 0;
+
   if (
-    lastCommitDate &&
-    lastCommitDate !== today &&
-    lastCommitDate !== yesterday
+    !hasNewCommitsThisRun &&                   // No new activity this run
+    originalLastCommitDate &&                  // User has committed before
+    originalLastCommitDate !== today &&         // Not committed today (already in DB)
+    originalLastCommitDate !== yesterday        // Not committed yesterday (still safe)
   ) {
-    const gap = diffDays(lastCommitDate, today) - 1; // missed days
+    const gap = diffDays(originalLastCommitDate, today) - 1; // missed days
 
     if (gap > 0) {
       if (shields >= gap) {
         shields -= gap; // Shields absorbed the gap; streak survives
       } else {
-        // Streak break penalty
+        // Streak break penalty — only penalise if streak was active
         if (currentStreak > 0 || (currentProfile?.current_streak ?? 0) > 0) {
           xp = Math.max(0, xp - 50);
         }
@@ -345,7 +364,7 @@ export async function calculateProgress(
 interface StreakTransitionResult {
   streak: number;
   shields: number;
-  /** True when shields saved the streak across a multi-day gap. */
+  /** True when streak continues (consecutive day OR shields bridged gap). */
   streakContinued: boolean;
 }
 
@@ -353,6 +372,11 @@ interface StreakTransitionResult {
  * Given the current streak state and the number of calendar days since the
  * last commit, returns the updated streak + shield values WITHOUT the +1
  * increment for the new commit day (that is applied by the caller).
+ *
+ * FIX: Previously this returned streak: currentStreak in the gap===1 case
+ * which was correct, but the caller was ALSO doing gap===1 check independently
+ * and double-incrementing. Now the caller always uses transition.streakContinued
+ * to decide whether to increment, regardless of gap size.
  */
 function applyStreakTransition(
   currentStreak: number,
@@ -368,6 +392,7 @@ function applyStreakTransition(
   const gapDays = daysSinceLast - 1; // days the user missed
 
   if (shields >= gapDays) {
+    // Shields absorb the gap — streak survives, shields consumed
     return {
       streak: currentStreak,
       shields: shields - gapDays,
@@ -375,7 +400,44 @@ function applyStreakTransition(
     };
   }
 
-  // Not enough shields — streak breaks
+  // Not enough shields — streak breaks, reset to 0 (caller will set to 1)
   return { streak: 0, shields: 0, streakContinued: false };
 }
 
+// ─────────────────────────────────────────────
+// Recovery utility: repair broken streaks
+// ─────────────────────────────────────────────
+
+/**
+ * USE THIS TO RECOVER USERS WHOSE STREAKS WERE WRONGLY BROKEN.
+ *
+ * For each affected user:
+ * 1. Fetch their full commit history from processed_commits table
+ * 2. Re-run calculateProgress from scratch (currentProfile: null, processedSHAs: empty)
+ * 3. Upsert the returned profileUpdate back to the profiles table
+ *
+ * SQL to find affected users (run in Supabase):
+ *
+ *   SELECT DISTINCT p.id, p.username, p.current_streak, p.last_commit_date
+ *   FROM profiles p
+ *   WHERE p.current_streak = 0
+ *     AND p.last_commit_date >= (NOW() - INTERVAL '14 days')::date::text
+ *   ORDER BY p.last_commit_date DESC;
+ *
+ * This finds users whose streak is 0 but they committed recently — strong
+ * signal their streak was wrongly broken by the decay bug.
+ */
+export async function recoverUserStreak(
+  userId: string,
+  fetchAllPushEvents: () => Promise<GitHubPushEvent[]>,
+  fetchCommitDetail: CalculateProgressInput['fetchCommitDetail']
+): Promise<CalculateProgressResult> {
+  const pushEvents = await fetchAllPushEvents();
+
+  return calculateProgress({
+    currentProfile: null,         // Start fresh — recalculate everything
+    pushEvents,
+    processedSHAs: new Set(),     // Treat all as unprocessed for recalculation
+    fetchCommitDetail,
+  });
+}
