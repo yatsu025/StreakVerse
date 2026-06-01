@@ -312,9 +312,25 @@ export default function Dashboard() {
         lastDate = date
       }
 
-      // Streak decay
+      // ── Streak decay — check shields before resetting ─────────────────────
+      // If last commit was more than 1 day ago, check if shields can save it
       if (lastDate && lastDate !== today && lastDate !== yesterday) {
-        currentStreak = 0
+        const missedDays = Math.round(
+          (new Date(today).getTime() - new Date(lastDate).getTime()) / 86_400_000
+        ) - 1  // days with no commit (gap days)
+
+        if (missedDays > 0) {
+          if (shields >= missedDays) {
+            // Shields absorb the gap — streak survives
+            shields -= missedDays
+            console.log('[Sync] Shields saved streak! Used', missedDays, 'shield(s). Remaining:', shields)
+          } else {
+            // Not enough shields — streak breaks
+            console.log('[Sync] Streak broken. Missed days:', missedDays, '| Shields:', shields)
+            currentStreak = 0
+            shields = 0
+          }
+        }
       }
 
       // ── Step 3: Calculate XP ──────────────────────────────────────────────
@@ -455,15 +471,16 @@ export default function Dashboard() {
   if (!user) return null
 
   /* ── DERIVED VALUES ── */
-  const streak  = profile?.current_streak ?? 0
-  const longest = profile?.longest_streak ?? 0
-  const xp      = profile?.xp ?? 0
-  const tierInfo = getTierFromXP(xp)
+  const streak    = profile?.current_streak ?? 0
+  const longest   = profile?.longest_streak ?? 0
+  const xp        = profile?.xp ?? 0
+  const tierInfo  = getTierFromXP(xp)
   const tierColor = tierInfo.color
-  const xpPct   = xpProgress(xp, tierInfo)
-  const shields = profile?.streak_shields ?? 0
-  const rankScore = profile?.rank_score ?? 0
-  const lastSync = profile?.last_commit_date ? new Date(profile.last_commit_date).toLocaleDateString() : 'NEVER'
+  const xpPct     = xpProgress(xp, tierInfo)
+  const shields   = profile?.streak_shields ?? 0
+  // Always calculate live — never use stale DB value
+  const rankScore = xp + streak * 5
+  const lastSync  = profile?.last_commit_date ? new Date(profile.last_commit_date).toLocaleDateString() : 'NEVER'
   const displayName = user.user_metadata?.full_name?.split(' ')[0] || profile?.username || 'RECRUIT'
   const githubName  = user.user_metadata?.user_name || profile?.username || 'unknown'
   const avatarUrl   = user.user_metadata?.avatar_url || profile?.avatar_url || ''

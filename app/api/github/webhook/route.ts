@@ -25,9 +25,13 @@ function verifySignature(body: string, signature: string | null, secret: string)
 }
 
 // ── XP helpers (same logic as dashboard) ─────────────────────────────────────
-function calcStreakFromDates(dates: string[]): {
+function calcStreakFromDates(
+  dates: string[],
+  existingShields: number = 0
+): {
   currentStreak: number
   longestStreak: number
+  shields: number
 } {
   const today     = new Date().toISOString().split('T')[0]
   const yesterday = new Date(Date.now() - 86_400_000).toISOString().split('T')[0]
@@ -51,11 +55,24 @@ function calcStreakFromDates(dates: string[]): {
     lastDate = date
   }
 
+  // Shield-aware decay
+  let shields = existingShields
   if (lastDate && lastDate !== today && lastDate !== yesterday) {
-    currentStreak = 0
+    const missedDays = Math.round(
+      (new Date(today).getTime() - new Date(lastDate).getTime()) / 86_400_000
+    ) - 1
+
+    if (missedDays > 0) {
+      if (shields >= missedDays) {
+        shields -= missedDays
+      } else {
+        currentStreak = 0
+        shields = 0
+      }
+    }
   }
 
-  return { currentStreak, longestStreak }
+  return { currentStreak, longestStreak, shields }
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
@@ -135,10 +152,9 @@ export async function POST(req: NextRequest) {
     const today       = new Date().toISOString().split('T')[0]
     const yesterday   = new Date(Date.now() - 86_400_000).toISOString().split('T')[0]
 
-    // 6. Recalculate streak
-    const { currentStreak, longestStreak } = calcStreakFromDates(commitDates)
-    const shields = profileData.streak_shields ?? 0
-
+    // 6. Recalculate streak (shield-aware)
+    const existingShields = profileData.streak_shields ?? 0
+    const { currentStreak, longestStreak, shields } = calcStreakFromDates(commitDates, existingShields)
     // 7. Calculate XP delta
     const existingXP        = profileData.xp ?? 0
     const rawLastDate       = profileData.last_commit_date ?? null
