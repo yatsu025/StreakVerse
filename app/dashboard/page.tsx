@@ -140,6 +140,12 @@ export default function Dashboard() {
     let authSub: any  = null
     let pollTimer: ReturnType<typeof setInterval> | null = null
 
+    // ── MAINTENANCE MODE ──────────────────────────────────────────────────
+    // Set to true to disable all auto-sync while fixing data manually.
+    // Change back to false when done.
+    const SYNC_PAUSED = true
+    // ─────────────────────────────────────────────────────────────────────
+
     const initialize = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
@@ -154,7 +160,7 @@ export default function Dashboard() {
         setUser(user)
         userRef.current = user
 
-        // Load existing profile
+        // Load existing profile (always — just no sync)
         const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
@@ -164,6 +170,20 @@ export default function Dashboard() {
         if (mounted && profileData) {
           setProfile(profileData)
           profileRef.current = profileData
+        }
+
+        // Skip sync if paused
+        if (SYNC_PAUSED) {
+          setSyncMsg('⏸ SYNC PAUSED — MAINTENANCE MODE')
+          setTimeout(() => setSyncMsg(''), 4000)
+          // Still set up auth listener but no polling
+          const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, s) => {
+            if (!mounted) return
+            if (event === 'SIGNED_OUT') { router.push('/'); return }
+            if (s?.user) { setUser(s.user); userRef.current = s.user }
+          })
+          authSub = subscription
+          return
         }
 
         // Initial sync on load
