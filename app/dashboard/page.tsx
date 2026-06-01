@@ -139,7 +139,7 @@ export default function Dashboard() {
     let mounted  = true
     let authSub: any  = null
     let pollTimer: ReturnType<typeof setInterval> | null = null
-    const SYNC_PAUSED = false
+    const SYNC_PAUSED = true
     // ─────────────────────────────────────────────────────────────────────
 
     const initialize = async () => {
