@@ -139,11 +139,7 @@ export default function Dashboard() {
     let mounted  = true
     let authSub: any  = null
     let pollTimer: ReturnType<typeof setInterval> | null = null
-
-    // ── MAINTENANCE MODE ──────────────────────────────────────────────────
-    // Set to true to disable all auto-sync while fixing data manually.
-    // Change back to false when done.
-    const SYNC_PAUSED = true
+    const SYNC_PAUSED = false
     // ─────────────────────────────────────────────────────────────────────
 
     const initialize = async () => {
