@@ -3,8 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { supabase } from '../lib/supabaseClient'
-import { signInWithGitHub, signOut } from '../utils/auth'
+import { supabase } from '../backend/db/supabaseClient'
+import { signInWithGitHub, signOut } from '../backend/auth/githubAuth'
 import {
   Home,
   Trophy,
