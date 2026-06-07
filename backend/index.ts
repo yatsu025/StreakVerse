@@ -22,7 +22,8 @@ export { applyShieldGain, applyShieldDecay, daysUntilNextShield, MAX_SHIELDS, SH
 export { calcDayXP, calcExtraPushXP, calcRankScore, XP_DAY_BONUS, XP_EXTRA_PUSH, XP_FIRST_LOGIN } from './xp/xpLogic'
 
 // Tiers
-export { getTierFromXP, xpProgressInTier, xpToNextTier, LEVELS } from './tiers/tierLogic'export type { Tier } from './tiers/tierLogic'
+export { getTierFromXP, xpProgressInTier, xpToNextTier, LEVELS } from './tiers/tierLogic'
+export type { Tier } from './tiers/tierLogic'
 
 // GitHub
 export { fetchUserPushEvents, countCommitsByDate, getCommitDates } from './github/githubEvents'

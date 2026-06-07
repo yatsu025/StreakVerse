@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { supabase } from '../backend/db/supabaseClient'
 import { Flame, Moon, Zap, Crown, Medal, Award, AlertTriangle, Swords, Shield, Star, ExternalLink, X, Github } from 'lucide-react'
-import { getTierFromXP } from '../lib/streakUtils'
+import { getTierFromXP } from '../backend/tiers/tierLogic'
 
 /* ─── Helpers ─── */
 function initial(name) { return (name || '?')[0].toUpperCase() }
