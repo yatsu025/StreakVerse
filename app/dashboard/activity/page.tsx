@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../../lib/supabaseClient'
-import { getTierFromXP } from '../../../lib/streakUtils'
+import { supabase } from '../../../backend/db/supabaseClient'
+import { getTierFromXP } from '../../../backend/tiers/tierLogic'
 import { ArrowLeft, Flame, Zap, Trophy, GitCommit, Calendar } from 'lucide-react'
 import Link from 'next/link'
 
