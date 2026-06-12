@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState, useRef } from 'react'
-import { supabase } from '../backend/db/supabaseClient'
+import { getSupabaseClient } from '../backend/db/supabaseClient'
 import { signInWithGitHub } from '../backend/auth/githubAuth'
 import { 
   Flame, 
@@ -34,6 +34,8 @@ import {
 
 import { getTierFromXP } from '../backend/tiers/tierLogic'
 import type { ProfileData } from '../backend/types'
+
+const supabase = getSupabaseClient()
 
 /* ─── DATA ────────────────────────────────────────────────── */
 
