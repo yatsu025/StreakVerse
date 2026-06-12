@@ -4,13 +4,11 @@ import { fetchUserPushEvents }    from '../../../../backend/github/githubEvents'
 import { calcProfileUpdate }      from '../../../../backend/sync/syncProfile'
 import type { ProfileData }       from '../../../../backend/types'
 
-// ── How many users to process per cron run ────────────────────────────────────
-// Vercel free tier: 10s timeout. At ~1s per user = max ~8 users safely.
-// Increase if on Pro plan (60s timeout).
+
 const BATCH_SIZE = 8
 
 export async function GET(req: NextRequest) {
-  // ── 1. Verify this is called by Vercel Cron (not a random person) ──────────
+
   const authHeader = req.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
 
@@ -22,11 +20,11 @@ export async function GET(req: NextRequest) {
   const startTime = Date.now()
   const supabase  = getSupabaseAdmin()
 
-  // ── 2. Fetch all profiles (username + last_commit_date + shields) ──────────
   const { data: profiles, error: fetchErr } = await supabase
     .from('profiles')
     .select('id, username, xp, current_streak, longest_streak, streak_shields, last_commit_date, last_commit_count, rank_score')
     .not('username', 'is', null)
+    .order('last_synced_at', { ascending: true, nullsFirst: true })
     .limit(BATCH_SIZE)
 
   if (fetchErr || !profiles) {
@@ -42,68 +40,79 @@ export async function GET(req: NextRequest) {
     errors:  [] as string[],
   }
 
-  // ── 3. Process each user ───────────────────────────────────────────────────
-  await Promise.allSettled(
-    profiles.map(async (profile: ProfileData) => {
-      try {
-        if (!profile.username) {
-          results.skipped.push(profile.id)
-          return
-        }
+  for (const profile of profiles as ProfileData[]) {
 
-        // Fetch GitHub push events
-        const pushEvents = await fetchUserPushEvents(profile.username)
 
-        if (pushEvents.length === 0) {
-          // No events BUT still run calcProfileUpdate — it handles streak decay
-          // (if user missed days without commits, streak breaks or shields consumed)
-        }
+    const label = profile.username ?? profile.id
 
-        // Calculate new profile state
-        // calcProfileUpdate handles:
-        //   - XP for new commit days
-        //   - Streak recalculation from GitHub dates
-        //   - Shield consumption if days were missed
-        //   - Shield gain every 7-day streak block
-        const { profileUpdate, addedXP } = calcProfileUpdate(profile, pushEvents)
+    try {
+      if (!profile.username) {
+        results.skipped.push(profile.id)
+        continue
+      }
 
-        // Only write to DB if something actually changed
-        const hasChanged =
-          profileUpdate.xp            !== profile.xp             ||
-          profileUpdate.current_streak !== profile.current_streak ||
-          profileUpdate.streak_shields !== profile.streak_shields  ||
-          profileUpdate.rank_score     !== profile.rank_score
+      const now = new Date().toISOString()
 
-        if (!hasChanged) {
-          results.skipped.push(profile.username)
-          return
-        }
+      // Fetch GitHub push events
+      const pushEvents = await fetchUserPushEvents(profile.username)
 
-        const { error: updateErr } = await supabase
+      if (pushEvents.length === 0) {
+        // No events BUT still run calcProfileUpdate — it handles streak decay
+        // (if user missed days without commits, streak breaks or shields consumed)
+      }
+
+      // Calculate new profile state
+      // calcProfileUpdate handles:
+      //   - XP for new commit days
+      //   - Streak recalculation from GitHub dates
+      //   - Shield consumption if days were missed
+      //   - Shield gain every 7-day streak block
+      const { profileUpdate, addedXP } = calcProfileUpdate(profile, pushEvents)
+
+
+      const hasChanged =
+        profileUpdate.xp             !== profile.xp             ||
+        profileUpdate.current_streak !== profile.current_streak ||
+        profileUpdate.longest_streak !== profile.longest_streak ||
+        profileUpdate.streak_shields !== profile.streak_shields ||
+        profileUpdate.rank_score     !== profile.rank_score
+
+      if (!hasChanged) {
+
+        await supabase
           .from('profiles')
-          .update(profileUpdate)
+          .update({ last_synced_at: now })
           .eq('id', profile.id)
 
-        if (updateErr) {
-          results.errors.push(`${profile.username}: ${updateErr.message}`)
-          return
-        }
-
-        console.log(
-          `[Cron] ✓ ${profile.username} | ` +
-          `streak: ${profile.current_streak} → ${profileUpdate.current_streak} | ` +
-          `shields: ${profile.streak_shields} → ${profileUpdate.streak_shields} | ` +
-          `+${addedXP} XP`
-        )
-
-        results.synced.push(profile.username)
-
-      } catch (err: any) {
-        console.error(`[Cron] Error for ${profile.username}:`, err.message)
-        results.errors.push(`${profile.username}: ${err.message}`)
+        results.skipped.push(label)
+        continue
       }
-    })
-  )
+
+      const { error: updateErr } = await supabase
+        .from('profiles')
+        .update({ ...profileUpdate, last_synced_at: now })
+        .eq('id', profile.id)
+
+      if (updateErr) {
+        results.errors.push(`${label}: ${updateErr.message}`)
+        continue
+      }
+
+      console.log(
+        `[Cron] ✓ ${label} | ` +
+        `streak: ${profile.current_streak} → ${profileUpdate.current_streak} | ` +
+        `longest: ${profile.longest_streak} → ${profileUpdate.longest_streak} | ` +
+        `shields: ${profile.streak_shields} → ${profileUpdate.streak_shields} | ` +
+        `+${addedXP} XP`
+      )
+
+      results.synced.push(label)
+
+    } catch (err: any) {
+      console.error(`[Cron] Error for ${label}:`, err.message)
+      results.errors.push(`${label}: ${err.message}`)
+    }
+  }
 
   const duration = Date.now() - startTime
   console.log(`[Cron] Done in ${duration}ms | synced: ${results.synced.length} | skipped: ${results.skipped.length} | errors: ${results.errors.length}`)
